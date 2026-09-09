@@ -87,11 +87,11 @@ export function SearchDialog() {
           role="dialog"
           aria-modal="true"
           aria-label="Search products"
-          className={`absolute inset-x-0 top-0 border-b border-line bg-paper transition-transform duration-200 ${
-            open ? "translate-y-0" : "-translate-y-full"
+          className={`absolute left-1/2 top-[max(6rem,12vh)] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-2xl border border-line bg-paper shadow-2xl transition-all duration-200 ${
+            open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"
           }`}
         >
-          <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3 px-4 py-4 sm:px-5">
             <form role="search" action="/search" onSubmit={onSubmit} className="flex-1">
               <label htmlFor="header-search-input" className="sr-only">
                 Search products
