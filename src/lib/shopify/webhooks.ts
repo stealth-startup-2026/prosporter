@@ -111,6 +111,77 @@ export function topicToTags(topic: string, payload: unknown): RevalidationPlan {
   return { topic: normalised, tags: [], handle, known: false };
 }
 
+// ------------------------------------------------------------------ settling
+//
+// Shopify fires the webhook the moment the admin write commits, but the
+// Storefront API (and its edge cache) can lag that write by a few seconds. If
+// the cache is expired while Shopify is still behind, the next visitor's
+// refetch stores the OLD data again, and it then sits there for the full
+// CATALOG_REVALIDATE_SECONDS window — observed in production as "the edit
+// never showed up". So before expiring the tags, the route probes the Storefront
+// API until it reports an `updatedAt` at or after the webhook's `updated_at`
+// (or, for a delete, until the resource is gone). The helpers below decide
+// *what* to probe and *when* it is caught up; the route owns the polling.
+
+/** What the route has to observe on the Storefront API before it may expire the cache. */
+export type ConsistencyProbe =
+  | {
+      kind: "product" | "collection";
+      handle: string;
+      /** The webhook's `updated_at`, ISO 8601, when the payload carried one. */
+      updatedAt: string | null;
+      /** True for delete topics: caught up once the Storefront API returns null. */
+      deleted: boolean;
+    }
+  | {
+      /** Nothing addressable to probe (inventory topics, payloads without a handle). */
+      kind: "delay";
+    };
+
+/** Pull an ISO-8601 `updated_at` out of an unknown JSON payload. */
+function readUpdatedAt(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const value = (payload as Record<string, unknown>).updated_at;
+  if (typeof value !== "string") return null;
+  return Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+/** Decide how the route should wait for Shopify to catch up with this event. */
+export function consistencyProbe(plan: RevalidationPlan, payload: unknown): ConsistencyProbe {
+  if (!plan.known || !plan.handle) return { kind: "delay" };
+  const [resource, verb] = plan.topic.split("/");
+  if (resource !== "products" && resource !== "collections") return { kind: "delay" };
+  return {
+    kind: resource === "products" ? "product" : "collection",
+    handle: plan.handle,
+    updatedAt: readUpdatedAt(payload),
+    deleted: verb === "delete",
+  };
+}
+
+/** What one Storefront API probe saw. `exists` false means the query returned null. */
+export type ProbeObservation = { exists: boolean; updatedAt: string | null };
+
+/**
+ * True once the Storefront API reflects the webhook's write.
+ *
+ * - delete: the resource must be gone.
+ * - create/update with a payload timestamp: the resource must exist and its
+ *   `updatedAt` must be at or after the webhook's `updated_at`.
+ * - create/update without a timestamp: existence is the best signal available.
+ */
+export function isCaughtUp(probe: ConsistencyProbe, observed: ProbeObservation): boolean {
+  if (probe.kind === "delay") return true;
+  if (probe.deleted) return !observed.exists;
+  if (!observed.exists) return false;
+  if (!probe.updatedAt) return true;
+  if (!observed.updatedAt) return false;
+  const seen = Date.parse(observed.updatedAt);
+  const wanted = Date.parse(probe.updatedAt);
+  if (!Number.isFinite(seen) || !Number.isFinite(wanted)) return false;
+  return seen >= wanted;
+}
+
 /** Every topic this receiver acts on. Kept in sync with scripts/webhooks/register_webhooks.py. */
 export const HANDLED_TOPICS: readonly string[] = [
   ...PRODUCT_TOPICS,

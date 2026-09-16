@@ -1,23 +1,129 @@
 import "server-only";
 
 import { revalidateTag } from "next/cache";
+import { after } from "next/server";
 
 import { errorFields, log } from "@/lib/log";
-import { topicToTags, verifyShopifyHmac } from "@/lib/shopify/webhooks";
+import { shopifyFetch } from "@/lib/shopify/client";
+import {
+  consistencyProbe,
+  isCaughtUp,
+  topicToTags,
+  verifyShopifyHmac,
+  type ConsistencyProbe,
+  type ProbeObservation,
+  type RevalidationPlan,
+} from "@/lib/shopify/webhooks";
 
 /**
  * Shopify webhook receiver.
  *
  * Shopify POSTs a JSON body signed with the app's client secret. We verify the
- * signature over the raw bytes, check the shop domain, then revalidate the
- * cache tags in `src/lib/shopify/tags.ts` for the affected resource. The
- * storefront holds no Admin token: this route only ever invalidates caches.
+ * signature over the raw bytes, check the shop domain, then expire the cache
+ * tags in `src/lib/shopify/tags.ts` for the affected resource. The storefront
+ * holds no Admin token: this route only ever invalidates caches.
  *
  * Shopify retries any response that is not 2xx and gives up after ~48 hours,
- * so the handler stays cheap and answers well inside the 5 second budget.
+ * so the handler answers 200 straight away and does the slow part — waiting
+ * for the Storefront API to catch up with the admin write, then expiring the
+ * tags — in `after()`, once the response has gone out.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Room for the post-response settle loop (SETTLE_TIMEOUT_MS) plus the probes. */
+export const maxDuration = 30;
+
+/** How long to wait for the Storefront API to reflect the write before expiring anyway. */
+const SETTLE_TIMEOUT_MS = 20_000;
+/** Gap between Storefront API probes. */
+const SETTLE_POLL_MS = 1_500;
+/** Fixed wait when there is nothing addressable to probe (inventory, no handle). */
+const SETTLE_FIXED_DELAY_MS = 4_000;
+
+const PROBE_QUERIES: Record<"product" | "collection", string> = {
+  product: /* GraphQL */ `
+    query WebhookProductProbe($handle: String!) {
+      product(handle: $handle) { updatedAt }
+    }
+  `,
+  collection: /* GraphQL */ `
+    query WebhookCollectionProbe($handle: String!) {
+      collection(handle: $handle) { updatedAt }
+    }
+  `,
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** One uncached Storefront API read of the affected resource's `updatedAt`. */
+async function observe(probe: Exclude<ConsistencyProbe, { kind: "delay" }>): Promise<ProbeObservation> {
+  const data = await shopifyFetch<Record<string, { updatedAt: string | null } | null>>({
+    query: PROBE_QUERIES[probe.kind],
+    variables: { handle: probe.handle },
+    cache: "no-store",
+    retry: false,
+    operation: `webhook.probe.${probe.kind}`,
+  });
+  const node = data[probe.kind];
+  return { exists: node !== null && node !== undefined, updatedAt: node?.updatedAt ?? null };
+}
+
+/**
+ * Expire the plan's tags once the Storefront API reflects the write.
+ *
+ * Runs after the 200 has been sent. Polls the Storefront API (uncached) until
+ * `isCaughtUp`, or gives up at SETTLE_TIMEOUT_MS and expires regardless — a
+ * late-but-correct expiry beats leaving the caches alone. Probe failures are
+ * logged and treated as "not yet".
+ */
+type Meta = Record<string, string | number | boolean | null | undefined>;
+
+async function settleAndExpire(plan: RevalidationPlan, payload: unknown, meta: Meta) {
+  const probe = consistencyProbe(plan, payload);
+  const started = Date.now();
+  let probes = 0;
+  let outcome: "caught_up" | "timeout" | "delayed" = "caught_up";
+
+  if (probe.kind === "delay") {
+    outcome = "delayed";
+    await sleep(SETTLE_FIXED_DELAY_MS);
+  } else {
+    for (;;) {
+      probes += 1;
+      try {
+        if (isCaughtUp(probe, await observe(probe))) break;
+      } catch (error) {
+        log.warn("shopify.webhook.probe_failed", { ...meta, probes, ...errorFields(error) });
+      }
+      if (Date.now() - started >= SETTLE_TIMEOUT_MS) {
+        outcome = "timeout";
+        break;
+      }
+      await sleep(SETTLE_POLL_MS);
+    }
+  }
+
+  try {
+    for (const tag of plan.tags) {
+      // `{ expire: 0 }` expires the tagged entries immediately, so the very next
+      // visit refetches from Shopify. The "max" profile would instead serve the
+      // stale copy once and refresh in the background, which made admin edits
+      // look like they took minutes to appear.
+      revalidateTag(tag, { expire: 0 });
+    }
+  } catch (error) {
+    log.error("shopify.webhook.revalidate_failed", { ...meta, ...errorFields(error) });
+    return;
+  }
+
+  log.info("shopify.webhook.revalidated", {
+    ...meta,
+    tags: plan.tags.length,
+    outcome,
+    probes,
+    waitedMs: Date.now() - started,
+  });
+}
 
 /** Known aliases for this store. The internal domain is what Shopify actually sends. */
 const KNOWN_SHOPS = ["ihuvab-u2.myshopify.com", "prosporter.myshopify.com"];
@@ -136,31 +242,8 @@ export async function POST(request: Request): Promise<Response> {
     return json(200, { ok: true, ignored: true });
   }
 
-  try {
-    for (const tag of plan.tags) {
-      // `{ expire: 0 }` expires the tagged entries immediately, so the very next
-      // visit refetches from Shopify. The "max" profile would instead serve the
-      // stale copy once and refresh in the background, which made admin edits
-      // look like they took minutes to appear (the first reload still showed the
-      // old product). One slower page load per edit is the better trade here.
-      revalidateTag(tag, { expire: 0 });
-    }
-  } catch (error) {
-    log.error("shopify.webhook.revalidate_failed", {
-      topic: plan.topic,
-      webhookId,
-      shop,
-      ...errorFields(error),
-    });
-    return json(500, { ok: false, error: "revalidation failed" });
-  }
-
-  log.info("shopify.webhook.revalidated", {
-    topic: plan.topic,
-    webhookId,
-    shop,
-    handle: plan.handle,
-    tags: plan.tags.length,
-  });
+  const meta = { topic: plan.topic, webhookId, shop, handle: plan.handle };
+  log.info("shopify.webhook.accepted", meta);
+  after(() => settleAndExpire(plan, payload, meta));
   return json(200, { ok: true, topic: plan.topic, tags: plan.tags });
 }

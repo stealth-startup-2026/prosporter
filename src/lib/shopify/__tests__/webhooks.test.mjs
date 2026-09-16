@@ -113,3 +113,59 @@ test("HANDLED_TOPICS covers exactly the mapped topics", () => {
     assert.equal(topicToTags(topic, {}).known, true, topic);
   }
 });
+
+// ----------------------------------------------------------------- settling
+
+import { consistencyProbe, isCaughtUp } from "../webhooks.ts";
+
+const planFor = (topic, payload) => topicToTags(topic, payload);
+
+test("consistencyProbe targets the product handle and carries the payload timestamp", () => {
+  const payload = { id: 1, handle: "nago", updated_at: "2026-09-16T01:48:23Z" };
+  assert.deepEqual(consistencyProbe(planFor("products/update", payload), payload), {
+    kind: "product",
+    handle: "nago",
+    updatedAt: "2026-09-16T01:48:23Z",
+    deleted: false,
+  });
+});
+
+test("consistencyProbe marks delete topics and handles collections", () => {
+  const payload = { id: 2, handle: "accessories", updated_at: "2026-09-16T01:48:23Z" };
+  const probe = consistencyProbe(planFor("collections/delete", payload), payload);
+  assert.equal(probe.kind, "collection");
+  assert.equal(probe.deleted, true);
+});
+
+test("consistencyProbe falls back to a fixed delay without a handle or for inventory", () => {
+  assert.deepEqual(consistencyProbe(planFor("products/update", { id: 1 }), { id: 1 }), { kind: "delay" });
+  const inv = { inventory_item_id: 1, updated_at: "2026-09-16T01:48:23Z" };
+  assert.deepEqual(consistencyProbe(planFor("inventory_levels/update", inv), inv), { kind: "delay" });
+});
+
+test("consistencyProbe drops an unparsable updated_at", () => {
+  const payload = { handle: "nago", updated_at: "not a date" };
+  assert.equal(consistencyProbe(planFor("products/update", payload), payload).updatedAt, null);
+});
+
+test("isCaughtUp waits for the Storefront updatedAt to reach the webhook timestamp", () => {
+  const probe = { kind: "product", handle: "nago", updatedAt: "2026-09-16T01:48:23Z", deleted: false };
+  assert.equal(isCaughtUp(probe, { exists: true, updatedAt: "2026-09-16T01:48:17Z" }), false);
+  assert.equal(isCaughtUp(probe, { exists: true, updatedAt: "2026-09-16T01:48:23Z" }), true);
+  assert.equal(isCaughtUp(probe, { exists: true, updatedAt: "2026-09-16T01:49:00Z" }), true);
+  assert.equal(isCaughtUp(probe, { exists: true, updatedAt: null }), false);
+  assert.equal(isCaughtUp(probe, { exists: false, updatedAt: null }), false);
+});
+
+test("isCaughtUp treats a delete as settled once the resource is gone", () => {
+  const probe = { kind: "product", handle: "nago", updatedAt: null, deleted: true };
+  assert.equal(isCaughtUp(probe, { exists: true, updatedAt: "2026-09-16T01:48:23Z" }), false);
+  assert.equal(isCaughtUp(probe, { exists: false, updatedAt: null }), true);
+});
+
+test("isCaughtUp without a payload timestamp settles on existence; delay probes are always settled", () => {
+  const probe = { kind: "product", handle: "nago", updatedAt: null, deleted: false };
+  assert.equal(isCaughtUp(probe, { exists: false, updatedAt: null }), false);
+  assert.equal(isCaughtUp(probe, { exists: true, updatedAt: null }), true);
+  assert.equal(isCaughtUp({ kind: "delay" }, { exists: false, updatedAt: null }), true);
+});

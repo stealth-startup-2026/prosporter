@@ -79,6 +79,29 @@ lands. (The `"max"` profile was tried first: it serves the stale copy once and
 refreshes in the background, which read as "changes take minutes to show".)
 The cost is one slower page load per edit instead of a stale one.
 
+### Waiting for Shopify to catch up
+
+Shopify fires the webhook the instant the admin write commits, but its
+Storefront API (and edge cache) can trail that write by a few seconds. Expiring
+the cache in that window makes the next visitor refetch the *old* data and
+store it for the full hour — measured in production as roughly one edit in three
+"never showing up". So the route answers 200 immediately and does the expiry in
+`after()`:
+
+1. `consistencyProbe(plan, payload)` picks what to watch: the product or
+   collection handle plus the payload's `updated_at`; delete topics wait for the
+   resource to disappear; inventory events and payloads without a handle get a
+   fixed 4 s delay instead.
+2. The route polls the Storefront API uncached every 1.5 s until `isCaughtUp`
+   reports an `updatedAt` at or after the webhook's `updated_at`, giving up after
+   20 s and expiring anyway (late-but-correct beats never).
+3. Then it expires the tags. `maxDuration` on the route is 30 s to leave room.
+
+Typical end-to-end latency, admin save → live page: about 1–3 s. Logs:
+`shopify.webhook.accepted` on receipt, `shopify.webhook.revalidated` with
+`outcome` (`caught_up` / `timeout` / `delayed`), `probes` and `waitedMs` once
+the expiry has run, `shopify.webhook.probe_failed` for a failed probe.
+
 ## Registering the subscriptions
 
 ```bash
