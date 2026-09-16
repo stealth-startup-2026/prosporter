@@ -5,6 +5,8 @@ import { after } from "next/server";
 
 import { errorFields, log } from "@/lib/log";
 import { shopifyFetch } from "@/lib/shopify/client";
+import { PRODUCT_METAFIELD_IDENTIFIERS } from "@/lib/shopify/fragments";
+import * as Q from "@/lib/shopify/queries";
 import {
   consistencyProbe,
   isCaughtUp,
@@ -40,26 +42,36 @@ const SETTLE_POLL_MS = 1_500;
 /** Fixed wait when there is nothing addressable to probe (inventory, no handle). */
 const SETTLE_FIXED_DELAY_MS = 4_000;
 
-const PROBE_QUERIES: Record<"product" | "collection", string> = {
-  product: /* GraphQL */ `
-    query WebhookProductProbe($handle: String!) {
-      product(handle: $handle) { updatedAt }
-    }
-  `,
-  collection: /* GraphQL */ `
-    query WebhookCollectionProbe($handle: String!) {
-      collection(handle: $handle) { updatedAt }
-    }
-  `,
+/**
+ * The probes send the SAME query text and variables as the page that renders
+ * the resource (`getProduct` / `getCollectionPage` with default options), not
+ * a slimmer one. Shopify caches Storefront API responses per query, and a
+ * slim probe was observed reporting "caught up" while the page's own query
+ * still returned the previous version — the page then re-cached stale data.
+ * Probing with the page's query means "fresh here" implies "fresh for the
+ * page" (same edge, same cache key). The page-size constant mirrors
+ * `PAGE_SIZE` in `src/lib/shopify/index.ts`.
+ */
+const PROBE_PAGE_SIZE = 250;
+const PROBE_QUERIES: Record<"product" | "collection", (handle: string) => { query: string; variables: Record<string, unknown> }> = {
+  product: (handle) => ({
+    query: Q.GET_PRODUCT_BY_HANDLE,
+    variables: { handle, metafieldIdentifiers: PRODUCT_METAFIELD_IDENTIFIERS },
+  }),
+  collection: (handle) => ({
+    query: Q.GET_COLLECTION_BY_HANDLE,
+    variables: { handle, first: PROBE_PAGE_SIZE, after: null, sortKey: null, reverse: null, filters: null },
+  }),
 };
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** One uncached Storefront API read of the affected resource's `updatedAt`. */
+/** One uncached read of the affected resource through the page's own query. */
 async function observe(probe: Exclude<ConsistencyProbe, { kind: "delay" }>): Promise<ProbeObservation> {
-  const data = await shopifyFetch<Record<string, { updatedAt: string | null } | null>>({
-    query: PROBE_QUERIES[probe.kind],
-    variables: { handle: probe.handle },
+  const { query, variables } = PROBE_QUERIES[probe.kind](probe.handle);
+  const data = await shopifyFetch<Record<string, { updatedAt?: string | null } | null>>({
+    query,
+    variables,
     cache: "no-store",
     retry: false,
     operation: `webhook.probe.${probe.kind}`,

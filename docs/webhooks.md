@@ -94,7 +94,11 @@ store it for the full hour — measured in production as roughly one edit in thr
    fixed 4 s delay instead.
 2. The route polls the Storefront API uncached every 1.5 s until `isCaughtUp`
    reports an `updatedAt` at or after the webhook's `updated_at`, giving up after
-   20 s and expiring anyway (late-but-correct beats never).
+   20 s and expiring anyway (late-but-correct beats never). The probe sends the
+   **page's own query** (`GET_PRODUCT_BY_HANDLE` / `GET_COLLECTION_BY_HANDLE`
+   with the page's default variables), because Shopify caches Storefront
+   responses per query: a slim `{ updatedAt }` probe was seen reporting fresh
+   while the page's query still returned the old version.
 3. Then it expires the tags. `maxDuration` on the route is 30 s to leave room.
 
 Typical end-to-end latency, admin save → live page: about 1–3 s. Logs:
