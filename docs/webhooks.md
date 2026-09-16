@@ -71,9 +71,13 @@ primary `prosporter.myshopify.com`. Shopify sends the internal one in
 Delete events usually arrive with only an id, so the fine-grained tag is skipped
 and the coarse tag does the work.
 
-Revalidation uses `revalidateTag(tag, "max")` — the two-argument form required
-by Next 16.3. Pages using the tag refresh as they are next visited, serving
-stale content while the refetch runs, rather than all at once.
+Revalidation uses `revalidateTag(tag, { expire: 0 })` — the two-argument form
+required by Next 16.3, with an inline profile that expires the tagged entries
+immediately. The next visit to an affected page refetches from Shopify before
+rendering, so an admin edit is visible on the first reload after the webhook
+lands. (The `"max"` profile was tried first: it serves the stale copy once and
+refreshes in the background, which read as "changes take minutes to show".)
+The cost is one slower page load per edit instead of a stale one.
 
 ## Registering the subscriptions
 

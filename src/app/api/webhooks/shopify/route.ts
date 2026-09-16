@@ -138,7 +138,12 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     for (const tag of plan.tags) {
-      revalidateTag(tag, "max");
+      // `{ expire: 0 }` expires the tagged entries immediately, so the very next
+      // visit refetches from Shopify. The "max" profile would instead serve the
+      // stale copy once and refresh in the background, which made admin edits
+      // look like they took minutes to appear (the first reload still showed the
+      // old product). One slower page load per edit is the better trade here.
+      revalidateTag(tag, { expire: 0 });
     }
   } catch (error) {
     log.error("shopify.webhook.revalidate_failed", {
