@@ -39,8 +39,14 @@ export const maxDuration = 30;
 const SETTLE_TIMEOUT_MS = 20_000;
 /** Gap between Storefront API probes. */
 const SETTLE_POLL_MS = 1_500;
-/** Consecutive fresh probes required before the first purge (replica lag, see settle loop). */
-const SETTLE_CONFIRMATIONS = 2;
+/**
+ * Consecutive fresh probes required before the first purge. Measured live:
+ * 1 → median 7.7 s edit-to-live, 2 → median 14.6 s (the readings flip between
+ * replicas, so lining two up takes longer and the first purge is still not
+ * guaranteed). The second purge pass is what guarantees correctness, so a
+ * single reading is the right trade.
+ */
+const SETTLE_CONFIRMATIONS = 1;
 /** Fixed wait when there is nothing addressable to probe (inventory, no handle). */
 const SETTLE_FIXED_DELAY_MS = 4_000;
 
