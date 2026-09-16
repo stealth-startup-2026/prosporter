@@ -93,8 +93,10 @@ store it for the full hour — measured in production as roughly one edit in thr
    resource to disappear; inventory events and payloads without a handle get a
    fixed 4 s delay instead.
 2. The route polls the Storefront API uncached every 1.5 s until `isCaughtUp`
-   reports an `updatedAt` at or after the webhook's `updated_at`, giving up after
-   20 s and expiring anyway (late-but-correct beats never). The probe sends the
+   reports an `updatedAt` at or after the webhook's `updated_at` on **two
+   consecutive probes** (the API is eventually consistent across replicas: one
+   read can be fresh and the next stale), giving up after 20 s and expiring
+   anyway (late-but-correct beats never). The probe sends the
    **page's own query** (`GET_PRODUCT_BY_HANDLE` / `GET_COLLECTION_BY_HANDLE`
    with the page's default variables), because Shopify caches Storefront
    responses per query: a slim `{ updatedAt }` probe was seen reporting fresh

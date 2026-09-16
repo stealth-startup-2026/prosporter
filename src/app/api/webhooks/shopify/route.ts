@@ -39,6 +39,8 @@ export const maxDuration = 30;
 const SETTLE_TIMEOUT_MS = 20_000;
 /** Gap between Storefront API probes. */
 const SETTLE_POLL_MS = 1_500;
+/** Consecutive fresh probes required before the first purge (replica lag, see settle loop). */
+const SETTLE_CONFIRMATIONS = 2;
 /** Fixed wait when there is nothing addressable to probe (inventory, no handle). */
 const SETTLE_FIXED_DELAY_MS = 4_000;
 
@@ -100,13 +102,20 @@ async function settleAndExpire(plan: RevalidationPlan, payload: unknown, meta: M
     outcome = "delayed";
     await sleep(SETTLE_FIXED_DELAY_MS);
   } else {
+    // The Storefront API is eventually consistent across replicas: one read
+    // can be fresh while the next, a second later, is still stale. So the
+    // write has to be seen on SETTLE_CONFIRMATIONS consecutive probes before
+    // the first purge is trusted.
+    let fresh = 0;
     for (;;) {
       probes += 1;
       try {
-        if (isCaughtUp(probe, await observe(probe))) break;
+        fresh = isCaughtUp(probe, await observe(probe)) ? fresh + 1 : 0;
       } catch (error) {
+        fresh = 0;
         log.warn("shopify.webhook.probe_failed", { ...meta, probes, ...errorFields(error) });
       }
+      if (fresh >= SETTLE_CONFIRMATIONS) break;
       if (Date.now() - started >= SETTLE_TIMEOUT_MS) {
         outcome = "timeout";
         break;
