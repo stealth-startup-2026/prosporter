@@ -99,7 +99,11 @@ store it for the full hour — measured in production as roughly one edit in thr
    with the page's default variables), because Shopify caches Storefront
    responses per query: a slim `{ updatedAt }` probe was seen reporting fresh
    while the page's query still returned the old version.
-3. Then it expires the tags. `maxDuration` on the route is 30 s to leave room.
+3. Then it expires the tags **and** the page's own path (`/product/<handle>` or
+   `/shop/<handle>`), and repeats both 5 s later. On Vercel a single purge was
+   seen not taking effect roughly one time in three, with the stale copy then
+   living out its full hour; the second pass also covers a regeneration that
+   raced the first purge. `maxDuration` on the route is 30 s to leave room.
 
 Typical end-to-end latency, admin save → live page: about 1–3 s. Logs:
 `shopify.webhook.accepted` on receipt, `shopify.webhook.revalidated` with

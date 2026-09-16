@@ -1,6 +1,6 @@
 import "server-only";
 
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 
 import { errorFields, log } from "@/lib/log";
@@ -116,13 +116,14 @@ async function settleAndExpire(plan: RevalidationPlan, payload: unknown, meta: M
   }
 
   try {
-    for (const tag of plan.tags) {
-      // `{ expire: 0 }` expires the tagged entries immediately, so the very next
-      // visit refetches from Shopify. The "max" profile would instead serve the
-      // stale copy once and refresh in the background, which made admin edits
-      // look like they took minutes to appear.
-      revalidateTag(tag, { expire: 0 });
-    }
+    expire(plan);
+    // Second pass: on Vercel a single purge was observed not taking effect on
+    // the page cache roughly one time in three, with the stale copy then
+    // living out its full hour. A repeat a few seconds later also covers a
+    // regeneration that raced the first purge. Cheap: it only costs a second
+    // refetch on the next visit.
+    await sleep(SECOND_PASS_DELAY_MS);
+    expire(plan);
   } catch (error) {
     log.error("shopify.webhook.revalidate_failed", { ...meta, ...errorFields(error) });
     return;
@@ -131,10 +132,34 @@ async function settleAndExpire(plan: RevalidationPlan, payload: unknown, meta: M
   log.info("shopify.webhook.revalidated", {
     ...meta,
     tags: plan.tags.length,
+    paths: pathsFor(plan).join(","),
     outcome,
     probes,
     waitedMs: Date.now() - started,
   });
+}
+
+/** Gap between the first and second purge. */
+const SECOND_PASS_DELAY_MS = 5_000;
+
+/** The page(s) that render this resource directly. Listings are covered by the coarse tags. */
+function pathsFor(plan: RevalidationPlan): string[] {
+  if (!plan.handle) return [];
+  if (plan.topic.startsWith("products/")) return [`/product/${plan.handle}`];
+  if (plan.topic.startsWith("collections/")) return [`/shop/${plan.handle}`];
+  return [];
+}
+
+/** Expire by tag (data + every page that used it) and by path (the page itself). */
+function expire(plan: RevalidationPlan): void {
+  for (const tag of plan.tags) {
+    // `{ expire: 0 }` expires the tagged entries immediately, so the very next
+    // visit refetches from Shopify. The "max" profile would instead serve the
+    // stale copy once and refresh in the background, which made admin edits
+    // look like they took minutes to appear.
+    revalidateTag(tag, { expire: 0 });
+  }
+  for (const path of pathsFor(plan)) revalidatePath(path);
 }
 
 /** Known aliases for this store. The internal domain is what Shopify actually sends. */
