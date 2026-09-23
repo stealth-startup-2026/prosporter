@@ -33,8 +33,6 @@ const clubLinks = taxonomy.collections
 export function Header() {
   return (
     <>
-      {/* The announcement bar lives in the root layout (AnnouncementBar.tsx):
-          it is static server-rendered text and paints before anything else. */}
       <header
         data-site-header
         className="sticky top-0 z-50 border-b border-line bg-paper/95 backdrop-blur transition-shadow"

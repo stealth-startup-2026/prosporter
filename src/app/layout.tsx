@@ -5,7 +5,6 @@ import { Analytics } from "@/components/analytics/Analytics";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { CartDrawerMount } from "@/components/cart/CartDrawerMount";
 import { isShopifyConfigured } from "@/lib/shopify";
-import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -86,7 +85,6 @@ export default function RootLayout({
             cutover. See docs/deployment.md § Analytics. */}
         <Analytics />
         <CartProvider enabled={cartEnabled}>
-          <AnnouncementBar />
           <Header />
           {/* tabIndex={-1} so the skip link can move real focus here, not just
               the scroll position; scroll-margin keeps it clear of the sticky
