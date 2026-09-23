@@ -13,7 +13,7 @@ import "server-only";
  * Nothing here calls `shopifyFetch` directly.
  */
 import redirectsJson from "../../docs/redirects/redirects.json";
-import { htmlToText, sanitizeContentHtml } from "./content-html";
+import { dropLeadingTitle, htmlToText, sanitizeContentHtml } from "./content-html";
 import { log, errorFields } from "./log";
 import {
   DEFAULT_BLOG_HANDLE,
@@ -155,7 +155,7 @@ export async function getContentPage(handle: string): Promise<ContentPageView | 
   const page = await getPage(handle);
   if (!page) return null;
 
-  const html = sanitizeContentHtml(page.body);
+  const html = dropLeadingTitle(sanitizeContentHtml(page.body), page.title);
   return {
     handle: page.handle,
     title: page.title,

@@ -212,8 +212,19 @@
    `Article.contentHtml`), sanitised by `src/lib/content-html.ts`. The source is
    Elementor/Gutenberg markup whose classes are stripped, so the elements arrive
    bare and every rule below has to come from here. */
-.page-content > * + * {
+.page-content > * + *,
+.page-content * + :is(p, ul, ol, dl, blockquote, table, figure, pre) {
   margin-top: 1em;
+}
+/* Policy pages are a run of `<h4>` sections (Eligibility, Refund Process...);
+   a rule above each one turns the wall of text into scannable sections. */
+.page-content :is(h2, h3, h4) {
+  border-top: 1px solid var(--color-line);
+  padding-top: 1.5em;
+  margin-top: 2em;
+}
+.page-content :is(h2, h3, h4) + * {
+  margin-top: 0.6em;
 }
 .page-content h1,
 .page-content h2,
@@ -230,13 +241,31 @@
 .page-content h2 {
   font-size: 1.35rem;
 }
-.page-content h3 {
+.page-content h3,
+.page-content h4 {
   font-size: 1.15rem;
 }
-.page-content h4,
 .page-content h5,
 .page-content h6 {
   font-size: 1rem;
+}
+/* Intro copy the old theme set in heading tags (`demoteSentenceHeadings`). */
+.page-content .lead {
+  color: var(--color-ink);
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+/* A slider of one repeated logo, collapsed to a single image by
+   `collapseRepeatedImageLists`. */
+.page-content .logo-strip {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+}
+.page-content .logo-strip img {
+  max-height: 3.5rem;
+  width: auto;
+  border-radius: 0;
 }
 .page-content ul,
 .page-content ol {

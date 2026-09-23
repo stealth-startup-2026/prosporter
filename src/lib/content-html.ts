@@ -110,12 +110,84 @@ function dropElements(html: string): string {
   return out;
 }
 
+const LEGACY_FOOTER_LOGO = /<img\b[^>]*Prosporter-Logo_Colour[^>]*>/gi;
+const LEGACY_FOOTER_COPYRIGHT = /(?:©|&copy;|&#0*169;)\s*Copyright\s*\d{4}/gi;
+
+/**
+ * Most migrated pages (policies, About, FAQ, Contact) end with a copy of the
+ * old WordPress site footer, built in Elementor: logo, site URL, policy and
+ * page links, phone, email and "© Copyright 2024". The storefront has its own
+ * footer, so everything from that logo onwards is dropped. Both markers must
+ * be present, logo before copyright, so a page that merely shows the logo keeps
+ * it. Cutting mid-tree leaves wrapper `<div>`s open; the HTML parser closes them.
+ */
+function stripLegacyFooter(html: string): string {
+  const copyrights = [...html.matchAll(LEGACY_FOOTER_COPYRIGHT)];
+  if (!copyrights.length) return html;
+  const lastCopyright = copyrights[copyrights.length - 1].index;
+  const logos = [...html.matchAll(LEGACY_FOOTER_LOGO)].filter((m) => m.index < lastCopyright);
+  if (!logos.length) return html;
+  return html.slice(0, logos[logos.length - 1].index);
+}
+
+function normaliseTitle(text: string): string {
+  return text.replace(/<[^>]*>/g, "").replace(/&[a-z#0-9]+;/gi, " ").replace(/[^a-z0-9]+/gi, "").toLowerCase();
+}
+
+/**
+ * A theme slider exported as a list of images (`<ul class="slides">`). On About
+ * it is the Nine logo repeated eight times, which renders as a bulleted column
+ * of identical images. A list made only of copies of one image is collapsed to
+ * a single centred image (`.logo-strip` in `globals.css`); a list of different
+ * images stays a list.
+ */
+function collapseRepeatedImageLists(html: string): string {
+  return html.replace(/<ul>((?:\s*<li>\s*<img\b[^>]*\/>\s*<\/li>)+)\s*<\/ul>/g, (list, items: string) => {
+    const srcs = new Set([...items.matchAll(/src="([^"]*)"/g)].map((m) => m[1]));
+    if (srcs.size !== 1) return list;
+    const img = /<img\b[^>]*\/>/.exec(items)![0];
+    return `<figure class="logo-strip">${img}</figure>`;
+  });
+}
+
+/**
+ * The old theme set intro copy in heading tags for the large type ("Welcome to
+ * our website, your one-stop destination..." as an `<h2>`). Headings that long
+ * are sentences, not section titles, so they become lead paragraphs; the
+ * `.lead` rule in `globals.css` keeps them large without the section divider.
+ */
+const SENTENCE_HEADING_WORDS = 12;
+
+function demoteSentenceHeadings(html: string): string {
+  return html.replace(/<(h[1-6])>([\s\S]*?)<\/\1>/g, (heading, _tag: string, inner: string) => {
+    const text = inner.replace(/<[^>]*>/g, " ").trim();
+    // FAQ questions are long but are genuine headings.
+    if (text.endsWith("?")) return heading;
+    const words = text.split(/\s+/).filter(Boolean);
+    return words.length >= SENTENCE_HEADING_WORDS ? `<p class="lead">${inner.trim()}</p>` : heading;
+  });
+}
+
+/**
+ * Migrated pages open with their own title (`<h1>Refund Policy</h1>` on the
+ * Elementor pages, `<h2>ABOUT</h2>` on About), which the route already renders
+ * from the page title. Drop it when it is the first element and says the same
+ * thing, so the page does not show its title twice.
+ */
+export function dropLeadingTitle(html: string, title: string): string {
+  // Opening builder wrappers may precede it; they stay, the heading goes.
+  const m = /^((?:\s*<(?:div|section|article|header|main)>)*)\s*<(h[12])>([\s\S]*?)<\/\2>/.exec(html);
+  if (!m || normaliseTitle(m[3]) !== normaliseTitle(title)) return html;
+  return m[1] + html.slice(m[0].length);
+}
+
 export function sanitizeContentHtml(html: string | null | undefined): string {
   if (!html) return "";
 
+  // 0. The legacy site footer copied into most page bodies (see above).
   // 1. HTML comments, including the `<!-- wp:... -->` / `<!-- /wp:... -->` pairs
   //    and any conditional comment. Also drops doctype/CDATA style declarations.
-  let out = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<![\s\S]*?>/g, "");
+  let out = stripLegacyFooter(html).replace(/<!--[\s\S]*?-->/g, "").replace(/<![\s\S]*?>/g, "");
 
   // 2. Scripts, styles, embeds, icon SVGs and forms, contents included.
   //
@@ -137,6 +209,13 @@ export function sanitizeContentHtml(html: string | null | undefined): string {
     const attrs = filterAttributes(tag, rawAttrs);
     return VOID_TAGS.has(tag) ? `<${tag}${attrs} />` : `<${tag}${attrs}>`;
   });
+
+  // Trailing `<br /><br />` was the editor's paragraph spacing; CSS does that now.
+  out = out.replace(/(?:\s*<br \/>)+\s*<\/(p|h[1-6])>/g, "</$1>");
+  // Paragraphs holding only a non-breaking space were spacers too.
+  out = out.replace(/<p>(?:\s|&nbsp;| )*<\/p>/g, "");
+  out = collapseRepeatedImageLists(out);
+  out = demoteSentenceHeadings(out);
 
   // Collapse the whitespace the page builder left between nested wrappers.
   return out.replace(/[ \t]*\n[ \t\n]*/g, "\n").trim();
