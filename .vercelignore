@@ -1,0 +1,8 @@
+# `vercel --prod` uploads the working tree and ignores .gitignore without this
+# file. Keep raw WooCommerce data (customers, orders) and local secrets off
+# Vercel; the build only needs src/, public/, docs/redirects and config.
+exports/
+exports-snapshot-*/
+scripts/
+.env*
+.next/
