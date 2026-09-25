@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   findVariant,
   isSizeOption,
@@ -353,12 +354,12 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
                   )}
                 </p>
                 {isSizeOption(option.name) && (
-                  <button
-                    type="button"
+                  <Link
+                    href="/size-guide"
                     className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
                   >
                     Size guide
-                  </button>
+                  </Link>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
