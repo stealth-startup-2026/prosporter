@@ -79,6 +79,7 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
   );
   // Null until the shopper picks a thumbnail; a variant image wins until then.
   const [pickedImage, setPickedImage] = useState<number | null>(null);
+  const zoomRef = useRef<HTMLDivElement | null>(null);
   const [added, setAdded] = useState(false);
   const uid = useId();
   const hintId = `pdp-hint-${uid}`;
@@ -180,16 +181,37 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
           of 80 px tiles, so without it a product with several images widens the
           whole document instead of scrolling inside the strip (QA defect D1). */}
       <div className="min-w-0">
-        <div className="relative aspect-[4/5] overflow-hidden rounded-card bg-surface">
-          <Image
-            src={hero?.url ?? PLACEHOLDER_IMAGE}
-            alt={hero ? hero.alt || product.title : "No photo available yet"}
-            fill
-            unoptimized={!hero}
-            priority
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-cover"
-          />
+        {/* Hover zoom: on a mouse (pointer-fine) the photo scales 2x and pans
+            with the cursor by moving transform-origin. Touch devices skip it. */}
+        <div
+          className={`group relative aspect-[4/5] overflow-hidden rounded-card bg-surface ${
+            hero ? "pointer-fine:cursor-zoom-in" : ""
+          }`}
+          onMouseMove={(e) => {
+            const zoom = zoomRef.current;
+            if (!zoom || !hero) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            zoom.style.transformOrigin = `${x}% ${y}%`;
+          }}
+        >
+          <div
+            ref={zoomRef}
+            className={`absolute inset-0 transition-transform duration-200 ease-out ${
+              hero ? "pointer-fine:group-hover:scale-[2]" : ""
+            }`}
+          >
+            <Image
+              src={hero?.url ?? PLACEHOLDER_IMAGE}
+              alt={hero ? hero.alt || product.title : "No photo available yet"}
+              fill
+              unoptimized={!hero}
+              priority
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="object-cover"
+            />
+          </div>
           {product.onSale && (
             <span className="absolute left-4 top-4 rounded-full bg-green-deep px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-paper">
               Sale

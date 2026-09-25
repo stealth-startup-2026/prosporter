@@ -38,6 +38,12 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+  /* Tailwind v4 preflight resets buttons to `cursor: default`; restore the
+     hand so thumbnails, swatches and toggles read as clickable. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
   ::selection {
     background: var(--color-green-deep);
     color: #fff;
