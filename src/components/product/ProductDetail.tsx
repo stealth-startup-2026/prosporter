@@ -409,9 +409,33 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
             </Accordion>
           )}
           <Accordion title="Shipping &amp; returns">
-            Free standard shipping on orders over $150. Easy 30-day returns on
-            unworn items with tags attached. Checkout is securely completed on
-            prosporter.com.au.
+            <div className="space-y-3">
+              <p>
+                <strong className="font-semibold text-ink">
+                  Free standard shipping
+                </strong>{" "}
+                on orders over $150.
+              </p>
+              <p>
+                <strong className="font-semibold text-ink">
+                  7-day change-of-mind returns
+                </strong>{" "}
+                on unworn items with tags attached.
+              </p>
+              <p>
+                A{" "}
+                <strong className="font-semibold text-ink">
+                  $20 fee applies per jersey printed with a number and/or
+                  surname
+                </strong>{" "}
+                for change-of-mind returns or exchanges.
+              </p>
+              <p>
+                This fee does not apply to remedies required under Australian
+                Consumer Law. Your statutory rights are unaffected.
+              </p>
+              <p>Checkout is securely completed on prosporter.com.au.</p>
+            </div>
           </Accordion>
           <Accordion title="Sizing">
             {product.details.size_guide ? (

@@ -216,12 +216,24 @@ export default async function Home() {
         <div className="grid gap-8 sm:grid-cols-3">
           {[
             { t: "Free shipping over $150", d: "Fast dispatch, Australia-wide." },
-            { t: "30-day easy returns", d: "Unworn, with tags — no fuss." },
+            {
+              t: "7-day change-of-mind returns",
+              d: "Unworn, with tags — no fuss. A $20 fee applies per jersey printed with a number and/or surname. Your rights under Australian Consumer Law are unaffected.",
+              href: "/refund-policy",
+            },
             { t: "Trusted by clubs", d: "Official teamwear partner." },
           ].map((v) => (
             <div key={v.t} className="border-t-2 border-ink pt-4">
               <h3 className="text-base font-semibold text-ink">{v.t}</h3>
               <p className="mt-1 text-sm text-muted">{v.d}</p>
+              {v.href && (
+                <Link
+                  href={v.href}
+                  className="mt-2 inline-block text-sm font-medium text-ink underline underline-offset-4 hover:text-green-deep"
+                >
+                  Read our refund policy
+                </Link>
+              )}
             </div>
           ))}
         </div>
