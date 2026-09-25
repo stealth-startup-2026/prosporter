@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/format";
 import { ChevronDown, CheckIcon } from "@/components/icons";
 
 export type FilterState = {
+  category: string[];
   gender: string[];
   surface: string[];
   colour: string[];
@@ -17,6 +18,7 @@ export type FilterState = {
 };
 
 export const emptyFilters: FilterState = {
+  category: [],
   gender: [],
   surface: [],
   colour: [],
@@ -176,7 +178,7 @@ export function Filters({
   onChange: (next: FilterState) => void;
 }) {
   const priceId = `filter-price-${useId()}`;
-  const toggle = (key: "gender" | "surface" | "colour" | "size", v: string) => {
+  const toggle = (key: "category" | "gender" | "surface" | "colour" | "size", v: string) => {
     const arr = value[key];
     onChange({
       ...value,
@@ -198,6 +200,20 @@ export function Filters({
           onChange={() => onChange({ ...value, onSale: !value.onSale })}
         />
       </Section>
+
+      {facets.category.length > 1 && (
+        <Section title="Category">
+          {facets.category.map((c) => (
+            <Check
+              key={c.value}
+              checked={value.category.includes(c.value)}
+              label={c.label}
+              count={c.count}
+              onChange={() => toggle("category", c.value)}
+            />
+          ))}
+        </Section>
+      )}
 
       {facets.gender.length > 1 && (
         <Section title="Gender">

@@ -131,6 +131,8 @@ export function buildFacets(products: CatalogProduct[]) {
     return m;
   };
 
+  const categories = tally(products.map((p) => p.categoryId));
+  const categoryLabels = new Map(products.map((p) => [p.categoryId, p.categoryLabel]));
   const genders = tally(products.flatMap((p) => p.gender));
   const surfaces = tally(products.flatMap((p) => (p.surface ? [p.surface] : [])));
   const colours = tally(products.flatMap((p) => p.colours));
@@ -140,6 +142,10 @@ export function buildFacets(products: CatalogProduct[]) {
   const prices = products.map((p) => p.price);
 
   return {
+    // Driven by the product's `type:` tag (see fromShopifyCard), so it matches the card label.
+    category: [...categories.entries()]
+      .map(([value, count]) => ({ value, label: categoryLabels.get(value) ?? value, count }))
+      .sort((a, b) => b.count - a.count),
     gender: [...genders.entries()].map(([value, count]) => ({ value, count })),
     surface: [...surfaces.entries()].map(([value, count]) => ({ value, count })),
     colour: [...colours.entries()]

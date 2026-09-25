@@ -41,6 +41,7 @@ export function Listing({ products, facets }: { products: CatalogProduct[]; face
     const result = products.filter((p) => {
       if (filters.inStock && !p.inStock) return false;
       if (filters.onSale && !p.onSale) return false;
+      if (filters.category.length && !filters.category.includes(p.categoryId)) return false;
       if (filters.gender.length && !filters.gender.some((g) => p.gender.includes(g)))
         return false;
       if (filters.surface.length && !(p.surface && filters.surface.includes(p.surface)))
@@ -82,6 +83,12 @@ export function Listing({ products, facets }: { products: CatalogProduct[]; face
 
   // Active filter chips
   const chips: { label: string; clear: () => void }[] = [];
+  filters.category.forEach((c) =>
+    chips.push({
+      label: facets.category.find((f) => f.value === c)?.label ?? c,
+      clear: () => setFilters((f) => ({ ...f, category: f.category.filter((x) => x !== c) })),
+    }),
+  );
   filters.gender.forEach((g) =>
     chips.push({
       label: GENDER_LABELS[g] ?? g,
