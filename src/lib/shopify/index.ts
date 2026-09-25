@@ -159,13 +159,29 @@ export class CartUserError extends Error {
   }
 }
 
-type CartPayload = { cart: Cart | null; userErrors: UserError[] };
+/**
+ * A non-fatal notice Shopify attaches to a cart mutation — most importantly
+ * MERCHANDISE_NOT_ENOUGH_STOCK, raised when an add/update asks for more than is
+ * in stock. The line is clamped to what's available rather than rejected, so
+ * the caller surfaces this to the shopper instead of silently shorting them.
+ */
+export type CartWarning = { code: string; message: string; target: string | null };
+
+type CartPayload = { cart: Cart | null; userErrors: UserError[]; warnings?: CartWarning[] };
+
+/** A cart plus any warnings from a line mutation (e.g. an over-stock clamp). */
+export type CartWithWarnings = { cart: Cart; warnings: CartWarning[] };
 
 function unwrapCart(payload: CartPayload | undefined, op: string): Cart {
   if (!payload) throw new Error(`Missing ${op} payload`);
   if (payload.userErrors?.length) throw new CartUserError(payload.userErrors);
   if (!payload.cart) throw new Error(`${op} returned no cart`);
   return payload.cart;
+}
+
+/** unwrapCart, keeping the warnings the line mutations return. */
+function unwrapCartWithWarnings(payload: CartPayload | undefined, op: string): CartWithWarnings {
+  return { cart: unwrapCart(payload, op), warnings: payload?.warnings ?? [] };
 }
 
 export type CartLineInput = {
@@ -183,28 +199,34 @@ export async function getCart(id: string): Promise<Cart | null> {
 
 export async function createCart(
   input: { lines?: CartLineInput[]; buyerIdentity?: BuyerIdentityInput; discountCodes?: string[] } = {},
-): Promise<Cart> {
+): Promise<CartWithWarnings> {
   const data = await shopifyFetch<{ cartCreate: CartPayload }>({
     query: Q.CART_CREATE,
     variables: { input: { ...input, buyerIdentity: { countryCode: "AU", ...input.buyerIdentity } } },
   });
-  return unwrapCart(data.cartCreate, "cartCreate");
+  return unwrapCartWithWarnings(data.cartCreate, "cartCreate");
 }
 
-export async function addCartLines(cartId: string, lines: CartLineInput[]): Promise<Cart> {
+export async function addCartLines(
+  cartId: string,
+  lines: CartLineInput[],
+): Promise<CartWithWarnings> {
   const data = await shopifyFetch<{ cartLinesAdd: CartPayload }>({
     query: Q.CART_LINES_ADD,
     variables: { cartId, lines },
   });
-  return unwrapCart(data.cartLinesAdd, "cartLinesAdd");
+  return unwrapCartWithWarnings(data.cartLinesAdd, "cartLinesAdd");
 }
 
-export async function updateCartLines(cartId: string, lines: { id: string; quantity: number }[]): Promise<Cart> {
+export async function updateCartLines(
+  cartId: string,
+  lines: { id: string; quantity: number }[],
+): Promise<CartWithWarnings> {
   const data = await shopifyFetch<{ cartLinesUpdate: CartPayload }>({
     query: Q.CART_LINES_UPDATE,
     variables: { cartId, lines },
   });
-  return unwrapCart(data.cartLinesUpdate, "cartLinesUpdate");
+  return unwrapCartWithWarnings(data.cartLinesUpdate, "cartLinesUpdate");
 }
 
 export async function removeCartLines(cartId: string, lineIds: string[]): Promise<Cart> {

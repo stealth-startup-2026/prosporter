@@ -78,25 +78,28 @@ export const GET_CART = /* GraphQL */ `
 `;
 
 const CART_USER_ERRORS = "userErrors { field message code }";
+// Shopify reports an over-stock add/update as a warning (the line is clamped to
+// available), not a userError, so line-quantity mutations request both.
+const CART_WARNINGS = "warnings { code message target }";
 
 export const CART_CREATE = /* GraphQL */ `
   ${CART_FRAGMENTS}
   mutation CartCreate($input: CartInput) {
-    cartCreate(input: $input) { cart { ...Cart } ${CART_USER_ERRORS} }
+    cartCreate(input: $input) { cart { ...Cart } ${CART_USER_ERRORS} ${CART_WARNINGS} }
   }
 `;
 
 export const CART_LINES_ADD = /* GraphQL */ `
   ${CART_FRAGMENTS}
   mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
-    cartLinesAdd(cartId: $cartId, lines: $lines) { cart { ...Cart } ${CART_USER_ERRORS} }
+    cartLinesAdd(cartId: $cartId, lines: $lines) { cart { ...Cart } ${CART_USER_ERRORS} ${CART_WARNINGS} }
   }
 `;
 
 export const CART_LINES_UPDATE = /* GraphQL */ `
   ${CART_FRAGMENTS}
   mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
-    cartLinesUpdate(cartId: $cartId, lines: $lines) { cart { ...Cart } ${CART_USER_ERRORS} }
+    cartLinesUpdate(cartId: $cartId, lines: $lines) { cart { ...Cart } ${CART_USER_ERRORS} ${CART_WARNINGS} }
   }
 `;
 

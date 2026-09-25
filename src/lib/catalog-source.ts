@@ -173,6 +173,7 @@ function toVariants(product: ShopifyProduct): CatalogVariant[] {
     title: v.title,
     sku: v.sku ?? null,
     available: v.availableForSale,
+    quantityAvailable: v.quantityAvailable ?? null,
     price: money(v.price.amount),
     compareAtPrice: v.compareAtPrice ? money(v.compareAtPrice.amount) : null,
     currency: v.price.currencyCode,

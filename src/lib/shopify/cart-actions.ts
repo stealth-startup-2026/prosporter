@@ -26,6 +26,7 @@ import {
   updateCartDiscountCodes,
   updateCartLines,
 } from "@/lib/shopify";
+import type { CartWarning } from "@/lib/shopify";
 import type { Cart } from "@/lib/shopify/types";
 import { errorFields, log } from "@/lib/log";
 
@@ -36,6 +37,17 @@ const MAX_QUANTITY = 100;
 
 const GENERIC_ERROR = "Something went wrong updating your bag. Please try again.";
 const UNAVAILABLE_ERROR = "The bag is unavailable right now. Please try again later.";
+const STOCK_CLAMP_MESSAGE = "That's all we have in stock, so we've set your bag to the most available.";
+
+/**
+ * Shopify clamps an over-stock add/update to what's available and reports it as
+ * a warning rather than a userError. Turn the stock warnings into one sentence
+ * the drawer can show; anything else (a benign warning we don't act on) is null.
+ */
+const STOCK_WARNING_CODES = new Set(["MERCHANDISE_NOT_ENOUGH_STOCK", "MERCHANDISE_OUT_OF_STOCK"]);
+function stockWarningMessage(warnings: CartWarning[]): string | null {
+  return warnings.some((w) => STOCK_WARNING_CODES.has(w.code)) ? STOCK_CLAMP_MESSAGE : null;
+}
 
 /** Every action returns the full cart so the client can replace its state wholesale. */
 export type CartActionResult = {
@@ -166,9 +178,15 @@ export async function addToCart(variantId: string, quantity = 1): Promise<CartAc
 
   if (existingId) {
     try {
-      const cart = await addCartLines(existingId, lines);
-      log.info("cart.line_added", { requestId, op: "addToCart", lines: cart.lines.edges.length });
-      return { cart, error: null, enabled: true };
+      const { cart, warnings } = await addCartLines(existingId, lines);
+      const stock = stockWarningMessage(warnings);
+      log.info("cart.line_added", {
+        requestId,
+        op: "addToCart",
+        lines: cart.lines.edges.length,
+        clamped: stock ? 1 : 0,
+      });
+      return { cart, error: stock, enabled: true };
     } catch (err) {
       if (!looksLikeMissingCart(err)) return toResult(null, err, "addToCart", requestId);
       // Cart expired or belongs to another store: drop it and start a new one.
@@ -178,10 +196,16 @@ export async function addToCart(variantId: string, quantity = 1): Promise<CartAc
   }
 
   try {
-    const cart = await createCart({ lines });
+    const { cart, warnings } = await createCart({ lines });
     await writeCartId(cart.id);
-    log.info("cart.created", { requestId, op: "addToCart", lines: cart.lines.edges.length });
-    return { cart, error: null, enabled: true };
+    const stock = stockWarningMessage(warnings);
+    log.info("cart.created", {
+      requestId,
+      op: "addToCart",
+      lines: cart.lines.edges.length,
+      clamped: stock ? 1 : 0,
+    });
+    return { cart, error: stock, enabled: true };
   } catch (err) {
     return toResult(null, err, "addToCart", requestId);
   }
@@ -197,9 +221,17 @@ export async function updateLine(lineId: string, quantity: number): Promise<Cart
   const cartId = await readCartId();
   if (!cartId) return { cart: null, error: null, enabled: true };
   try {
-    const cart = await updateCartLines(cartId, [{ id: lineId, quantity: clampQuantity(quantity) }]);
-    log.info("cart.line_updated", { requestId, op: "updateLine", lines: cart.lines.edges.length });
-    return { cart, error: null, enabled: true };
+    const { cart, warnings } = await updateCartLines(cartId, [
+      { id: lineId, quantity: clampQuantity(quantity) },
+    ]);
+    const stock = stockWarningMessage(warnings);
+    log.info("cart.line_updated", {
+      requestId,
+      op: "updateLine",
+      lines: cart.lines.edges.length,
+      clamped: stock ? 1 : 0,
+    });
+    return { cart, error: stock, enabled: true };
   } catch (err) {
     if (looksLikeMissingCart(err)) {
       await clearCartId();

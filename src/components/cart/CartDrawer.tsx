@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/format";
 import { normalizeDiscountCode } from "@/lib/cart-totals";
 import { beginCheckoutParams, track } from "@/lib/analytics";
 import { useModalDialog } from "@/lib/hooks/useModalDialog";
+import { stockCeiling } from "@/lib/cart-quantity";
 import { CloseIcon, PlusIcon, MinusIcon, ArrowRight, ChevronDown } from "@/components/icons";
 import type { CartLine } from "@/lib/shopify/types";
 
@@ -327,6 +328,14 @@ export function CartDrawer() {
                 const summary = variantSummary(line);
                 const title = line.merchandise.product.title;
                 const name = summary ? `${title} (${summary})` : title;
+                // Cap the "+" at available stock so the drawer can't push a line
+                // past what Shopify would accept; a null quantityAvailable falls
+                // back to the soft ceiling. The server still clamps as a backstop.
+                const ceiling = stockCeiling(
+                  line.merchandise.quantityAvailable,
+                  line.merchandise.availableForSale,
+                );
+                const atStockMax = ceiling > 0 && line.quantity >= ceiling;
                 return (
                   <li key={line.id} className="flex gap-4 py-4">
                     <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-card bg-surface">
@@ -355,8 +364,15 @@ export function CartDrawer() {
                         </p>
                       </div>
                       {summary && <p className="mt-0.5 text-xs text-muted">{summary}</p>}
-                      {!line.merchandise.availableForSale && (
+                      {!line.merchandise.availableForSale ? (
                         <p className="mt-0.5 text-xs text-subtle">Out of stock</p>
+                      ) : (
+                        atStockMax &&
+                        line.merchandise.quantityAvailable != null && (
+                          <p className="mt-0.5 text-xs text-subtle">
+                            Only {ceiling} in stock
+                          </p>
+                        )
                       )}
                       <div className="mt-auto flex items-center justify-between pt-2">
                         <div className="flex items-center rounded-full border border-line">
@@ -377,9 +393,13 @@ export function CartDrawer() {
                           <button
                             type="button"
                             onClick={() => setQty(line.id, line.quantity + 1)}
-                            disabled={isPending}
-                            aria-disabled={isPending}
-                            aria-label={`Increase quantity of ${name}`}
+                            disabled={isPending || atStockMax}
+                            aria-disabled={isPending || atStockMax}
+                            aria-label={
+                              atStockMax
+                                ? `No more of ${name} in stock`
+                                : `Increase quantity of ${name}`
+                            }
                             className="grid h-8 w-8 place-items-center text-ink transition-colors hover:text-green-deep disabled:opacity-50"
                           >
                             <PlusIcon width={16} height={16} />

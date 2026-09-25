@@ -8,10 +8,11 @@ import {
   type CatalogProductDetail,
 } from "@/lib/catalog-view";
 import { formatPrice, formatPriceRange, swatchFor } from "@/lib/format";
+import { clampQuantity, isLowStock, maxAddable, stockCeiling } from "@/lib/cart-quantity";
 import { useCart } from "@/components/cart/CartProvider";
 import { track, viewItemParams } from "@/lib/analytics";
 import { PLACEHOLDER_IMAGE } from "@/components/product/placeholder";
-import { CheckIcon, ChevronDown } from "@/components/icons";
+import { CheckIcon, ChevronDown, MinusIcon, PlusIcon } from "@/components/icons";
 
 /** Disclosure: button and panel wired together with aria-expanded/controls. */
 function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
@@ -73,7 +74,7 @@ function defaultSelection(product: CatalogProductDetail): Record<string, string>
 }
 
 export function ProductDetail({ product }: { product: CatalogProductDetail }) {
-  const { add, addVariant, isPending } = useCart();
+  const { add, addVariant, isPending, lines } = useCart();
   const [selection, setSelection] = useState<Record<string, string>>(() =>
     defaultSelection(product),
   );
@@ -81,8 +82,14 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
   const [pickedImage, setPickedImage] = useState<number | null>(null);
   const zoomRef = useRef<HTMLDivElement | null>(null);
   const [added, setAdded] = useState(false);
+  // Desired add quantity. Kept as the raw value the shopper asked for; the
+  // stock-aware clamp happens during render (`qty` below), and `choose` resets
+  // it to 1 whenever the variant changes.
+  const [quantity, setQuantity] = useState(1);
   const uid = useId();
   const hintId = `pdp-hint-${uid}`;
+  const qtyId = `pdp-qty-${uid}`;
+  const stockHintId = `pdp-stock-${uid}`;
 
   /**
    * GA4 view_item (CLNT-179): once per product, not once per variant click.
@@ -127,6 +134,33 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
   const awaitingSelection = needsSelection && !complete;
   const canAdd = inStock && !awaitingSelection;
 
+  /**
+   * Quantity ceiling. `quantityAvailable` is authoritative when Shopify reports
+   * it (this store's token has the inventory scope); it falls back to a soft
+   * max on any buyable variant otherwise. We subtract what the bag already holds
+   * of this exact variant so cart qty + new qty can never exceed stock.
+   */
+  const variantId = variant?.id ?? product.variantId;
+  const inCart = variantId
+    ? lines.reduce((n, l) => (l.merchandise.id === variantId ? n + l.quantity : n), 0)
+    : 0;
+  const variantStock = variant ? variant.quantityAvailable : null;
+  const stockCap = maxAddable(variantStock, inStock, inCart);
+  // Clamp during render rather than in an effect (react-hooks/set-state-in-effect);
+  // a shrinking cap (e.g. after adding from the drawer) corrects the display here.
+  const qty = clampQuantity(quantity, stockCap);
+  const addable = canAdd && stockCap > 0;
+  // In stock and selected, but every unit is already in the bag.
+  const atCapacity = canAdd && stockCap === 0;
+  const totalStock = stockCeiling(variantStock, inStock);
+  const lowStock = variant ? isLowStock(variant.quantityAvailable, variant.available) : false;
+  const maxedMessage =
+    atCapacity && totalStock > 0
+      ? `You already have all ${totalStock} in your bag.`
+      : null;
+  const lowStockHint =
+    addable && lowStock && totalStock > 0 ? `Only ${totalStock} left` : null;
+
   /** Does any purchasable variant carry this option value? */
   const valueAvailable = (optionName: string, value: string) => {
     if (product.variants.length === 0) return true;
@@ -140,15 +174,16 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
   const choose = (option: string, value: string) => {
     setSelection((s) => ({ ...s, [option]: value }));
     setPickedImage(null);
+    // A new variant has its own stock; start the stepper back at one.
+    setQuantity(1);
   };
 
   const handleAdd = () => {
     // Belt and braces: the button is disabled in this state, so this only
     // guards a programmatic click.
-    if (!canAdd) return;
-    const variantId = variant?.id ?? product.variantId;
+    if (!addable) return;
     if (variantId) {
-      addVariant(variantId);
+      addVariant(variantId, qty);
     } else {
       // Mock catalog: no Shopify variant to add, so the drawer shim runs.
       add({
@@ -157,6 +192,7 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
         price,
         image: hero?.url ?? PLACEHOLDER_IMAGE,
         size: product.options.map((o) => selection[o.name]).filter(Boolean).join(" / ") || null,
+        qty,
       });
     }
     setAdded(true);
@@ -382,16 +418,82 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
           </p>
         )}
 
+        {/* Quantity stepper — real number input flanked by −/+ buttons, styled
+            to match the size chips. Shown only once a purchasable variant is on
+            the table and there is headroom to add; when the bag already holds
+            all the stock, the maxed message below replaces it. */}
+        {addable && (
+          <div className="mt-6">
+            <div className="mb-2 flex items-center justify-between">
+              <label htmlFor={qtyId} className="eyebrow text-ink">
+                Quantity
+              </label>
+              {lowStockHint && (
+                <span id={stockHintId} className="text-xs font-medium text-green-deep">
+                  {lowStockHint}
+                </span>
+              )}
+            </div>
+            <div className="inline-flex items-center rounded-full border border-line">
+              <button
+                type="button"
+                onClick={() => setQuantity(clampQuantity(qty - 1, stockCap))}
+                disabled={qty <= 1}
+                aria-disabled={qty <= 1}
+                aria-label="Decrease quantity"
+                className="grid h-11 w-11 place-items-center rounded-full text-ink transition-colors hover:text-green-deep disabled:opacity-40"
+              >
+                <MinusIcon width={16} height={16} aria-hidden="true" />
+              </button>
+              <input
+                id={qtyId}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={stockCap}
+                step={1}
+                value={qty}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (Number.isFinite(next)) setQuantity(next);
+                }}
+                // Normalise a mid-edit value (blank, over the cap) on blur.
+                onBlur={() => setQuantity(qty)}
+                aria-label="Quantity"
+                aria-describedby={lowStockHint ? stockHintId : undefined}
+                className="w-12 border-0 bg-transparent text-center text-sm font-medium tabular-nums text-ink outline-none [appearance:textfield] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-deep [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <button
+                type="button"
+                onClick={() => setQuantity(clampQuantity(qty + 1, stockCap))}
+                disabled={qty >= stockCap}
+                aria-disabled={qty >= stockCap}
+                aria-label="Increase quantity"
+                className="grid h-11 w-11 place-items-center rounded-full text-ink transition-colors hover:text-green-deep disabled:opacity-40"
+              >
+                <PlusIcon width={16} height={16} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        )}
+        {maxedMessage && (
+          <p id={stockHintId} className="mt-6 text-sm font-medium text-muted">
+            {maxedMessage}
+          </p>
+        )}
+
         {/* Add to cart */}
         <button
           type="button"
           onClick={handleAdd}
-          disabled={!canAdd || isPending}
-          aria-disabled={!canAdd || isPending}
+          disabled={!addable || isPending}
+          aria-disabled={!addable || isPending}
           aria-busy={isPending}
-          aria-describedby={awaitingSelection ? hintId : undefined}
+          aria-describedby={
+            awaitingSelection ? hintId : atCapacity ? stockHintId : undefined
+          }
           className={`mt-7 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold transition-colors ${
-            !canAdd
+            !addable
               ? "cursor-not-allowed bg-surface-2 text-subtle"
               : added
                 ? "bg-green-deep text-paper"
@@ -402,6 +504,8 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
             "Sold out"
           ) : awaitingSelection ? (
             chooseHint
+          ) : atCapacity ? (
+            "All in your bag"
           ) : isPending ? (
             "Adding…"
           ) : added ? (
@@ -409,7 +513,7 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
               <CheckIcon width={18} height={18} aria-hidden="true" /> Added to bag
             </>
           ) : (
-            `Add to bag · ${formatPrice(price, product.currency)}`
+            `Add ${qty > 1 ? `${qty} ` : ""}to bag · ${formatPrice(price * qty, product.currency)}`
           )}
         </button>
 

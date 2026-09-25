@@ -58,6 +58,12 @@ export type CatalogVariant = {
   /** Merchant SKU, when set. Feeds the product page's structured data. */
   sku: string | null;
   available: boolean;
+  /**
+   * Units Shopify says are in stock, or null when it does not report a number
+   * (untracked variant, or a token without `unauthenticated_read_product_inventory`).
+   * The product page uses it to cap the quantity stepper; see `src/lib/cart-quantity.ts`.
+   */
+  quantityAvailable: number | null;
   price: number;
   compareAtPrice: number | null;
   currency: string;
