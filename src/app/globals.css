@@ -330,6 +330,69 @@
   display: none;
 }
 
+/* News post photos and video (`src/lib/article-gallery.ts`, `content-html.ts`).
+   Every photo is a button that opens the viewer (PhotoLightbox). */
+.page-content .article-photo {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 0.5rem;
+  cursor: zoom-in;
+}
+.page-content .article-photo img {
+  display: block;
+  width: 100%;
+  transition: opacity 150ms ease-out;
+}
+.page-content .article-photo:hover img {
+  opacity: 0.9;
+}
+/* Two or more photos in a row: a grid of square tiles, two across on a phone,
+   three from `sm`. An odd last tile on a phone spans the row instead of
+   leaving a gap. */
+.page-content .article-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 1.5em;
+}
+.page-content .article-gallery .article-photo img {
+  aspect-ratio: 1;
+  height: 100%;
+  object-fit: cover;
+}
+.page-content .article-gallery .article-photo:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.page-content .article-gallery .article-photo:last-child:nth-child(odd) img {
+  aspect-ratio: 4 / 3;
+}
+@media (min-width: 40rem) {
+  .page-content .article-gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .page-content .article-gallery .article-photo:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+  .page-content .article-gallery .article-photo:last-child:nth-child(odd) img {
+    aspect-ratio: 1;
+  }
+}
+/* YouTube / Vimeo player, 16:9 at full column width. */
+.page-content .video-embed {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--color-ink);
+}
+.page-content .video-embed iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

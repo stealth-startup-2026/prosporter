@@ -284,8 +284,6 @@ paper).
 | `src/app/shop/[[...segments]]/page.tsx` | 72 | Breadcrumb |
 | `src/app/product/[slug]/page.tsx` | 86 | Breadcrumb |
 | `src/app/page.tsx` | 76, 122, 151, 174, 205 | Section eyebrows and the "shop the range" link caret |
-| `src/app/blog/page.tsx` | 35, 61 | "Journal" eyebrow, article dates |
-| `src/app/blog/[slug]/page.tsx` | 87, 92 | "Back to journal" link, article meta line |
 | `src/app/error.tsx` | 21, 27 | "Something went wrong" eyebrow, the error reference |
 | `src/app/not-found.tsx` | 9 | "404" eyebrow |
 
@@ -295,6 +293,10 @@ Add-to-bag state, and disabled controls are outside 1.4.3.
 One line was moved off the token in this pass because it sits directly under the
 new discount total and had to be legible: the drawer's "Shipping & taxes
 calculated at checkout" is now `text-muted`.
+
+The News & Events pages (`src/app/blog/`, `src/components/news/`) were rebuilt on
+`text-muted` for their eyebrow, dates and back link, so they no longer appear in
+the table above.
 
 ---
 

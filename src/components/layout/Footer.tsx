@@ -44,7 +44,7 @@ const cols = [
     title: "Company & Legal",
     links: [
       { label: "About", href: "/about" },
-      { label: "Blog", href: "/blog" },
+      { label: "News & Events", href: "/blog" },
       { label: "Terms of Service", href: "/terms-of-service" },
       { label: "Refund Policy", href: "/refund-policy" },
       { label: "Privacy Policy", href: "/privacy-policy" },

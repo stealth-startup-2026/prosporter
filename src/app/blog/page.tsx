@@ -2,87 +2,79 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { formatArticleDate, getArticleList } from "@/lib/content-source";
+import { NewsListing, type NewsCardData } from "@/components/news/NewsListing";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/json-ld";
 import { OG_DEFAULTS } from "@/lib/seo/metadata";
 
 /**
- * Blog index (CLNT-171). Every legacy `/category/<slug>/` and `/tag/<slug>/`
- * archive plus the preserved `/blog` path lands here, so the route must always
- * answer 200 — including when Shopify is unconfigured, where the list is empty.
+ * News & Events (CLNT-171 blog index, relabelled for the client's news
+ * section). Every legacy `/category/<slug>/` and `/tag/<slug>/` archive plus the
+ * preserved `/blog` path lands here, so the route must always answer 200 —
+ * including when Shopify is unconfigured or nothing is published yet, where it
+ * shows the empty state.
  *
- * Articles come from the `news` blog, newest first; `-2` duplicate handles left
- * by the WooCommerce export are filtered out of the listing in `content.ts`.
+ * Posts come from the Shopify `news` blog, newest first, and only those tagged
+ * News, Tournaments, Tours or Events are listed (`src/lib/news.ts`). The
+ * category filter runs on the client against the full list, so the page stays
+ * prerendered; `?category=` links are shareable but the canonical is `/blog`.
+ * Staff guide: `docs/news/README.md`.
  */
-const BLOG_DESCRIPTION = "News, guides and product notes from the ProSporter team.";
+const NEWS_TITLE = "News & Events · ProSporter";
+const NEWS_DESCRIPTION =
+  "Tournaments, tours, events and team news from ProSporter, volleyball teamwear built for the Australian game.";
 
 export const metadata: Metadata = {
-  title: "Journal · ProSporter",
-  description: BLOG_DESCRIPTION,
+  title: NEWS_TITLE,
+  description: NEWS_DESCRIPTION,
   alternates: { canonical: "/blog" },
   openGraph: {
     ...OG_DEFAULTS,
     type: "website",
     url: "/blog",
-    title: "Journal · ProSporter",
-    description: BLOG_DESCRIPTION,
+    title: NEWS_TITLE,
+    description: NEWS_DESCRIPTION,
   },
 };
 
-export default async function BlogIndex() {
+export default async function NewsIndex() {
   const articles = await getArticleList();
+  const items: NewsCardData[] = articles.map((article) => ({
+    ...article,
+    date: formatArticleDate(article.publishedAt),
+  }));
 
   return (
-    <div className="mx-auto max-w-[1000px] px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-      <p className="eyebrow text-subtle">Journal</p>
-      <h1 className="display mt-3 text-4xl sm:text-5xl">Latest articles</h1>
+    <div className="mx-auto max-w-[1200px] px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+      <JsonLd
+        data={buildBreadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "News & Events", path: "/blog" },
+        ])}
+      />
+      <p className="eyebrow text-muted">News &amp; Events</p>
+      <h1 className="display mt-3 text-4xl sm:text-5xl lg:text-6xl">On court with ProSporter</h1>
+      <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">
+        Tournaments, tours, events and team news from the clubs and players we kit out.
+      </p>
 
-      {articles.length === 0 ? (
-        <p className="mt-8 max-w-md text-sm text-muted">
-          There are no articles to show right now. Please check back soon.
-        </p>
+      {items.length === 0 ? (
+        <div className="mt-12 rounded-card border border-line bg-surface px-6 py-14 text-center sm:px-10">
+          <p className="display text-2xl sm:text-3xl">No news yet</p>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted">
+            Tournament reports, tours and event photos will appear here as they happen. Check back
+            soon.
+          </p>
+          <Link
+            href="/shop"
+            className="mt-6 inline-flex rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink-2"
+          >
+            Shop all
+          </Link>
+        </div>
       ) : (
-        <ul className="mt-12 grid gap-10 sm:grid-cols-2">
-          {articles.map((article) => {
-            const date = formatArticleDate(article.publishedAt);
-            return (
-              <li key={article.handle}>
-                <Link href={`/blog/${article.handle}`} className="group block">
-                  {article.image && (
-                    // Migrated article images are served by Shopify's CDN; a plain
-                    // <img> keeps the route free of intrinsic-size guesswork for
-                    // assets whose dimensions the listing query does not rely on.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={article.image.url}
-                      alt={article.image.alt ?? ""}
-                      className="mb-4 aspect-[3/2] w-full rounded-lg object-cover"
-                    />
-                  )}
-                  {date && (
-                    <time dateTime={article.publishedAt ?? undefined} className="eyebrow text-subtle">
-                      {date}
-                    </time>
-                  )}
-                  <h2 className="mt-2 text-lg font-semibold transition-colors group-hover:text-ink-2">
-                    {article.title}
-                  </h2>
-                  {article.excerpt && (
-                    <p className="mt-2 line-clamp-3 text-sm text-muted">{article.excerpt}</p>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <NewsListing items={items} />
       )}
-
-      <div className="mt-16">
-        <Link
-          href="/shop"
-          className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink-2"
-        >
-          Shop all
-        </Link>
-      </div>
     </div>
   );
 }

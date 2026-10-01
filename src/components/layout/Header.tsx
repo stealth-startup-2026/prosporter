@@ -13,6 +13,14 @@ const collectionLinks = [
   { label: "Indoor", href: "/shop/indoor" },
 ];
 
+/**
+ * News & Events (`/blog`): tournaments, tours and events from the Shopify blog.
+ * The extra link would make the desktop nav wrap up to ~1224 px, so the link gap
+ * is 12 px below `xl`; that keeps wrapping to below ~1144 px, where it already
+ * started before News was added.
+ */
+const newsLink = { label: "News", href: "/blog" };
+
 const clubLinks = taxonomy.collections
   .filter((c) => c.type === "club")
   .map((c) => ({ label: c.label, href: `/shop/clubs/${c.id}` }));
@@ -54,7 +62,7 @@ export function Header() {
           </Link>
 
           {/* Primary nav */}
-          <nav aria-label="Primary" className="hidden flex-1 items-center gap-5 lg:flex">
+          <nav aria-label="Primary" className="hidden flex-1 items-center gap-3 lg:flex xl:gap-5">
             {taxonomy.primary_nav.map((cat) => (
               <Link
                 key={cat.id}
@@ -74,6 +82,13 @@ export function Header() {
                 {c.label}
               </Link>
             ))}
+            <span className="h-4 w-px bg-line" />
+            <Link
+              href={newsLink.href}
+              className="text-sm font-medium text-ink/80 transition-colors hover:text-green-deep"
+            >
+              {newsLink.label}
+            </Link>
           </nav>
 
           {/* Actions */}
@@ -115,7 +130,7 @@ export function Header() {
             ))}
           </ul>
           <p className="eyebrow mb-2 text-subtle">Clubs &amp; Teams</p>
-          <ul className="space-y-1">
+          <ul className="mb-6 space-y-1">
             {clubLinks.map((c) => (
               <li key={c.href}>
                 <Link href={c.href} className="block py-2 text-lg font-medium">
@@ -123,6 +138,13 @@ export function Header() {
                 </Link>
               </li>
             ))}
+          </ul>
+          <ul className="space-y-1 border-t border-line pt-4">
+            <li>
+              <Link href={newsLink.href} className="block py-2 text-lg font-medium">
+                News &amp; Events
+              </Link>
+            </li>
           </ul>
         </nav>
       </MobileMenuPanel>
