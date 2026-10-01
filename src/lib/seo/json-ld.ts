@@ -237,6 +237,13 @@ export type ArticleJsonLdInput = {
   description?: string | null;
   /** Absolute image URL, when the article has one. */
   image?: string | null;
+  /**
+   * Every photo on the page, cover first (News posts). Absolute URLs or app
+   * paths; takes precedence over `image`. Capped at 10.
+   */
+  images?: string[];
+  /** News categories shown on the page, as `articleSection`. */
+  sections?: string[];
   datePublished?: string | null;
   dateModified?: string | null;
   /** Display name only. Never an email address. */
@@ -245,6 +252,11 @@ export type ArticleJsonLdInput = {
 
 export function buildArticleJsonLd(input: ArticleJsonLdInput): JsonLdNode {
   const url = absoluteUrl(input.path);
+  const images = (input.images ?? (input.image ? [input.image] : []))
+    .filter((src) => typeof src === "string" && src.trim() !== "")
+    .map((src) => (/^https?:\/\//i.test(src) ? src : absoluteUrl(src)))
+    .slice(0, 10);
+  const sections = (input.sections ?? []).map((section) => text(section, 60)).filter(Boolean) as string[];
   return compact({
     "@context": CONTEXT,
     "@type": "Article",
@@ -252,7 +264,8 @@ export function buildArticleJsonLd(input: ArticleJsonLdInput): JsonLdNode {
     url,
     headline: text(input.headline, 110),
     description: text(input.description, 1000),
-    image: input.image ? [input.image] : undefined,
+    image: images,
+    articleSection: sections.length > 1 ? sections : sections[0],
     datePublished: text(input.datePublished, 40),
     dateModified: text(input.dateModified ?? input.datePublished, 40),
     author: input.authorName

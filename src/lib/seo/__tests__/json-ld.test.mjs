@@ -301,6 +301,25 @@ test("Article carries the byline name only and defaults dateModified to publishe
   assert.equal(/mailto:|@[a-z0-9-]+\.[a-z]{2,}/i.test(JSON.stringify(node.author)), false);
 });
 
+test("a News post lists every photo, absolutised, and its categories", () => {
+  const node = buildArticleJsonLd({
+    path: "/blog/xiamen",
+    headline: "Xiamen",
+    images: ["https://cdn.shopify.com/s/files/1/a.jpg?width=2048", "/news/x/b.jpg", ""],
+    sections: ["Tournaments", "Tours"],
+  });
+  assert.deepEqual(node.image, [
+    "https://cdn.shopify.com/s/files/1/a.jpg?width=2048",
+    "https://prosporter.com.au/news/x/b.jpg",
+  ]);
+  assert.deepEqual(node.articleSection, ["Tournaments", "Tours"]);
+  assert.equal(
+    buildArticleJsonLd({ path: "/blog/x", headline: "X", sections: ["News"] }).articleSection,
+    "News",
+  );
+  assert.equal("articleSection" in buildArticleJsonLd({ path: "/blog/x", headline: "X" }), false);
+});
+
 test("an article without a byline is published by the Organization", () => {
   const node = buildArticleJsonLd({ path: "/blog/x", headline: "X" });
   assert.deepEqual(node.author, { "@id": "https://prosporter.com.au#organization" });

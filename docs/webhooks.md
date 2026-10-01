@@ -71,6 +71,11 @@ primary `prosporter.myshopify.com`. Shopify sends the internal one in
 Delete events usually arrive with only an id, so the fine-grained tag is skipped
 and the coarse tag does the work.
 
+Blog articles (the News & Events section) have no mapping: their reads use a
+shorter window instead, `ARTICLE_REVALIDATE_SECONDS` (5 minutes) in
+`src/lib/shopify/tags.ts`, so a post published in Shopify admin is listed on
+`/blog` within about five minutes. `docs/news/README.md` tells staff to expect that.
+
 Revalidation uses `revalidateTag(tag, { expire: 0 })` — the two-argument form
 required by Next 16.3, with an inline profile that expires the tagged entries
 immediately. The next visit to an affected page refetches from Shopify before
