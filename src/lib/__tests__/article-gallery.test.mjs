@@ -74,3 +74,11 @@ test("works on real sanitiser output from the Shopify editor", () => {
 test("empty input", () => {
   assert.deepEqual(buildArticleGallery(""), { html: "", images: [] });
 });
+
+test("placeholder characters in the input cannot crash the render", () => {
+  for (const mark of ["", "", ""]) {
+    const { html, images } = buildArticleGallery(`<p>a${mark}5${mark}b</p>${img("x")}`);
+    assert.match(html, /^<p>a5b<\/p><button/);
+    assert.equal(images.length, 1);
+  }
+});

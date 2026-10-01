@@ -46,6 +46,9 @@ export async function generateMetadata({
     title: article.seoTitle || `${article.title} · ProSporter`,
     description,
     alternates: { canonical: `/blog/${article.handle}` },
+    // Posts without a News category (the migrated WordPress posts) are kept
+    // reachable for the legacy redirects but out of the index.
+    ...(article.categories.length === 0 ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       ...OG_DEFAULTS,
       type: "article",

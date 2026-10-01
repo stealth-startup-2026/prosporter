@@ -115,3 +115,19 @@ test("encodes attribute entities exactly once", () => {
     `<a href="/search?q=a&amp;b=1">x</a><img src="/a.jpg" alt="Team &amp; coach" />`,
   );
 });
+
+test("never restores a video player inside an attribute value", () => {
+  const html = sanitizeContentHtml(
+    `<img src="/a.jpg" alt="<iframe src='https://www.youtube.com/embed/dQw4w9WgXcQ'></iframe>" />`,
+    { videos: true },
+  );
+  assert.doesNotMatch(html, /iframe|video-embed/);
+  assert.match(html, /^<img src="\/a\.jpg" alt="[^"]*" \/>$/);
+});
+
+test("placeholder characters in the input are dropped, not treated as players", () => {
+  for (const mark of ["", "", ""]) {
+    const html = sanitizeContentHtml(`<p>a${mark}7${mark}b</p>`, { videos: true });
+    assert.equal(html, "<p>a7b</p>");
+  }
+});

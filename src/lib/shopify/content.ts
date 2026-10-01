@@ -136,6 +136,7 @@ const GET_ARTICLE_HANDLES = /* GraphQL */ `
           node {
             handle
             publishedAt
+            tags
           }
         }
         ${PAGE_INFO}
@@ -219,8 +220,8 @@ export async function getArticle(
 /** Every article handle in the blog, duplicates included. Walks all pages. */
 export async function getAllArticleHandles(
   blogHandle: string = DEFAULT_BLOG_HANDLE,
-): Promise<{ handle: string; publishedAt: string }[]> {
-  type Node = { handle: string; publishedAt: string };
+): Promise<{ handle: string; publishedAt: string; tags: string[] }[]> {
+  type Node = { handle: string; publishedAt: string; tags: string[] };
   const all: Node[] = [];
   let after: string | null = null;
   do {

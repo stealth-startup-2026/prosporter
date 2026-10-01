@@ -109,7 +109,9 @@ function filterAttributes(tag: string, raw: string): string {
   while ((m = ATTR_RE.exec(raw))) {
     const name = m[1].toLowerCase();
     if (!allowed.has(name)) continue;
-    const value = decodeAttr((m[2] ?? m[3] ?? m[4] ?? "").trim());
+    // An iframe written inside an attribute value (`alt="<iframe …>"`) is still
+    // matched by `extractVideos`; its placeholder must not be restored there.
+    const value = decodeAttr((m[2] ?? m[3] ?? m[4] ?? "").replace(VIDEO_MARK_RE, "").trim());
     if ((name === "href" || name === "src" || name === "cite") && !SAFE_URL.test(value)) continue;
     out.push(`${name}="${escapeAttr(value)}"`);
   }
@@ -217,7 +219,11 @@ export function sanitizeContentHtml(
   // 0. The legacy site footer copied into most page bodies (see above).
   // 1. HTML comments, including the `<!-- wp:... -->` / `<!-- /wp:... -->` pairs
   //    and any conditional comment. Also drops doctype/CDATA style declarations.
-  let out = stripLegacyFooter(html).replace(/<!--[\s\S]*?-->/g, "").replace(/<![\s\S]*?>/g, "");
+  //    The private-use placeholder characters (here and in `article-gallery.ts`)
+  //    are removed from the input first, so only our own placeholders exist.
+  let out = stripLegacyFooter(html.replace(PLACEHOLDER_CHARS, ""))
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<![\s\S]*?>/g, "");
 
   // 1b. Recognised video players are swapped for a placeholder before step 2
   //     drops every iframe, and rebuilt from the video id at the end.
@@ -277,6 +283,9 @@ export function sanitizeContentHtml(
 type Video = { provider: "youtube" | "vimeo"; id: string; hash: string | null; title: string };
 
 const VIDEO_MARK = "\uE003";
+const VIDEO_MARK_RE = new RegExp(`${VIDEO_MARK}\\d*${VIDEO_MARK}?`, "g");
+/** Every placeholder used by this module and `article-gallery.ts`. */
+const PLACEHOLDER_CHARS = /[\uE001-\uE003]/g;
 const IFRAME_RE = /<iframe\b((?:"[^"]*"|'[^']*'|[^"'>])*)>[\s\S]*?<\/iframe\s*>/gi;
 const YOUTUBE_SRC =
   /^(?:https?:)?\/\/(?:www\.)?(?:youtube\.com|youtube-nocookie\.com)\/embed\/([A-Za-z0-9_-]{11})(?:[?#].*)?$/i;
@@ -335,11 +344,15 @@ function playerHtml(video: Video): string {
 
 function restoreVideos(html: string, videos: Video[]): string {
   const mark = `${VIDEO_MARK}(\\d+)${VIDEO_MARK}`;
+  const player = (n: string) => {
+    const video = videos[Number(n)];
+    return video ? playerHtml(video) : "";
+  };
   return html
     // A player alone in a paragraph or wrapper replaces the wrapper, so a block
     // never ends up inside a <p>.
-    .replace(new RegExp(`<(p|div)>\\s*${mark}\\s*<\\/\\1>`, "g"), (_m, _tag, n: string) => playerHtml(videos[Number(n)]))
-    .replace(new RegExp(mark, "g"), (_m, n: string) => playerHtml(videos[Number(n)]));
+    .replace(new RegExp(`<(p|div)>\\s*${mark}\\s*<\\/\\1>`, "g"), (_m, _tag, n: string) => player(n))
+    .replace(new RegExp(mark, "g"), (_m, n: string) => player(n));
 }
 
 /** Plain text from HTML, for metadata descriptions and excerpts. */

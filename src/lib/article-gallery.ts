@@ -67,6 +67,7 @@ const LINKED_IMAGES = /<a\b[^>]*>(?:\s|<br \/>)*(?:<img\b[^>]*\/>(?:\s|<br \/>)*
 /** Private-use code points as placeholders; never present in editorial copy. */
 const LINK_MARK = "\uE001";
 const PHOTO_MARK = "\uE002";
+const PLACEHOLDER_CHARS = /[-]/g;
 const PHOTO = new RegExp(`${PHOTO_MARK}(\\d+)${PHOTO_MARK}`, "g");
 /** A `<p>`, `<div>` or `<figure>` holding nothing but photos and line breaks. */
 const PHOTO_BLOCK = new RegExp(
@@ -107,9 +108,10 @@ export function buildArticleGallery(
 ): { html: string; images: GalleryImage[] } {
   if (!html) return { html: "", images: [] };
 
-  // 1. Linked images keep their link and stay out of the viewer.
+  // 1. Linked images keep their link and stay out of the viewer. Placeholder
+  //    characters already in the input are dropped so only ours are restored.
   const linked: string[] = [];
-  let out = html.replace(LINKED_IMAGES, (match) => {
+  let out = html.replace(PLACEHOLDER_CHARS, "").replace(LINKED_IMAGES, (match) => {
     linked.push(match);
     return `${LINK_MARK}${linked.length - 1}${LINK_MARK}`;
   });
@@ -158,6 +160,7 @@ export function buildArticleGallery(
     const i = Number(n);
     const tag = tags[i];
     const image = images[i];
+    if (tag === undefined || image === undefined) return "";
     const position = startIndex + i;
     const display = sizedImageUrl(decodeAttr(attr(tag, "src") ?? ""), inGrid.has(i) ? PHOTO_WIDTH.tile : PHOTO_WIDTH.single);
     const size =
@@ -173,7 +176,7 @@ export function buildArticleGallery(
   });
 
   // 5. Put the linked images back untouched.
-  out = out.replace(new RegExp(`${LINK_MARK}(\\d+)${LINK_MARK}`, "g"), (_m, n: string) => linked[Number(n)]);
+  out = out.replace(new RegExp(`${LINK_MARK}(\\d+)${LINK_MARK}`, "g"), (_m, n: string) => linked[Number(n)] ?? "");
 
   return { html: out, images };
 }

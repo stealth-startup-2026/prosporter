@@ -78,9 +78,12 @@ export const CONTACT_PAGE_HANDLE = "contact";
  * Storefront `Article` shape so they go through exactly the mapping a Shopify
  * post does. Today that is the first real News post, the Xiamen trip, with its
  * photos under `public/news/`; the copy is the same as the ready-to-paste
- * version in `docs/news/2026-10-xiamen-val-elite.md`. Never read in Shopify mode.
+ * version in `docs/news/2026-10-xiamen-val-elite.md`. Never read in Shopify mode,
+ * and empty on a Vercel production build, so a production deploy that lost its
+ * Shopify keys shows "No news yet" rather than an unpublished preview post.
  */
-const MOCK_ARTICLES = mockArticlesJson as ContentArticle[];
+const MOCK_ARTICLES: ContentArticle[] =
+  process.env.VERCEL_ENV === "production" ? [] : (mockArticlesJson as ContentArticle[]);
 
 /** Blog slugs the legacy redirect map points at, read straight from the map. */
 export const LEGACY_ARTICLE_SLUGS: string[] = Array.from(
@@ -357,8 +360,10 @@ export async function getContentPageSitemapEntries(): Promise<SitemapEntry[]> {
 export async function getArticleSitemapEntries(): Promise<SitemapEntry[]> {
   if (contentSource() === "mock") return [];
   try {
+    // Only listed News posts: the untagged WordPress posts still answer 200 for
+    // the legacy redirects but are `noindex` (see `/blog/[slug]`).
     return (await getAllArticleHandles(DEFAULT_BLOG_HANDLE))
-      .filter((a) => !isDuplicateHandle(a.handle))
+      .filter((a) => !isDuplicateHandle(a.handle) && categoriesFromTags(a.tags).length > 0)
       .map((a) => ({ path: `/blog/${a.handle}`, lastModified: a.publishedAt || null }));
   } catch (err) {
     log.warn("content.sitemap_failed", { route: "blog", ...errorFields(err) });
