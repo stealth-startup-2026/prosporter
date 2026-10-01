@@ -271,7 +271,8 @@ export function sanitizeContentHtml(
  * viewer presses play). The CSP's `frame-src` allows exactly these two player
  * origins (`src/lib/security-headers.ts`). `allow` only delegates features the
  * page's own Permissions-Policy does not deny, so the browser logs no
- * permissions warnings.
+ * permissions warnings; fullscreen is granted there too, not with the legacy
+ * `allowfullscreen` attribute (Chrome warns when both are present).
  */
 type Video = { provider: "youtube" | "vimeo"; id: string; hash: string | null; title: string };
 
@@ -327,7 +328,7 @@ function playerHtml(video: Video): string {
       : `https://player.vimeo.com/video/${video.id}${video.hash ? `?h=${video.hash}` : ""}`;
   return (
     `<div class="video-embed"><iframe src="${src}" title="${escapeAttr(video.title)}" loading="lazy" ` +
-    `allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen ` +
+    `allow="autoplay; encrypted-media; picture-in-picture; fullscreen" ` +
     `referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
   );
 }

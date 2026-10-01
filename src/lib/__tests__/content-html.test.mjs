@@ -78,7 +78,7 @@ test("rebuilds a YouTube embed as a nocookie player when videos are on", () => {
   const html = sanitizeContentHtml(`<p>a</p>${YT}`, { videos: true });
   assert.equal(
     html,
-    `<p>a</p><div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" title="Finals day" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`,
+    `<p>a</p><div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" title="Finals day" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`,
   );
 });
 
