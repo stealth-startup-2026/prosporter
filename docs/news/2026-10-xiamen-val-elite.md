@@ -4,7 +4,9 @@ Requested by Mladen (ProGroup): VAL Elite Amateur League in Xiamen, October 2026
 Volleyball Club Sydney United supported by ProSporter. Facts come from his message
 and the championship backdrop in the photos ("2026-2027 厦门排球精英赛 / VAL
 Volleyball Elite Championship Xiamen, 2026.10.1-6", "by VAL", VAL logo reading
-"Volleyball Amateur League"). There are no results, scores or quotes in it on
+"Volleyball Amateur League"). The event is named as Mladen wrote it, "VAL Elite
+Amateur League" (his choice, 1 Oct 2026); the alt text describes the backdrop as it
+reads. There are no results, scores or quotes in it on
 purpose; add them only once Mladen supplies them.
 
 How to publish: [README.md](./README.md). Fields below are in the order the Shopify
@@ -12,7 +14,7 @@ form shows them.
 
 ## Title
 
-Sydney United at the VAL Elite Championship in Xiamen
+Sydney United at the VAL Elite Amateur League in Xiamen
 
 ## Content
 
@@ -21,8 +23,7 @@ line, in that order (they show as a three-photo grid). The words "Contact us"
 should link to `/contact`.
 
 > Volleyball Club Sydney United has travelled to Xiamen, China, for the VAL
-> Volleyball Elite Championship. The championship is presented by VAL, the
-> Volleyball Amateur League, and runs from 1 to 6 October 2026.
+> Elite Amateur League, which runs from 1 to 6 October 2026.
 >
 > ProSporter is proud to support the team on this trip. The squad is wearing navy
 > ProSporter kit in Xiamen, and it is great to see our colours on court so far from
@@ -36,8 +37,8 @@ should link to `/contact`.
 
 ## Excerpt
 
-Volleyball Club Sydney United is in Xiamen, China, for the VAL Volleyball Elite
-Championship from 1 to 6 October 2026, with ProSporter supporting the team.
+Volleyball Club Sydney United is in Xiamen, China, for the VAL Elite Amateur
+League from 1 to 6 October 2026, with ProSporter supporting the team.
 
 ## Image (cover) and photos
 
