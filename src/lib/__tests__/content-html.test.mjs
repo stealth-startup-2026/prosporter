@@ -65,3 +65,10 @@ test("drops a leading <h1> that repeats the page title", () => {
   assert.equal(dropLeadingTitle(html, "Refund Policy"), "<div><div></div><p>Body</p></div>");
   assert.equal(dropLeadingTitle("<h1>Welcome</h1><p>x</p>", "About"), "<h1>Welcome</h1><p>x</p>");
 });
+
+test("encodes attribute entities exactly once", () => {
+  assert.equal(
+    sanitizeContentHtml(`<a href="/search?q=a&amp;b=1">x</a><img src="/a.jpg" alt="Team &amp; coach" />`),
+    `<a href="/search?q=a&amp;b=1">x</a><img src="/a.jpg" alt="Team &amp; coach" />`,
+  );
+});

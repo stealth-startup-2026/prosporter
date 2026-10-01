@@ -81,6 +81,21 @@ function escapeAttr(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Attribute values arrive entity-encoded (`alt="Team &amp; coach"`, `?a=1&amp;b=2`).
+ * Decode the five XML entities first so `escapeAttr` encodes them exactly once;
+ * without this the browser shows a literal "&amp;" in alt text and breaks query
+ * strings. `&amp;` goes last so "&amp;lt;" stays the text "&lt;".
+ */
+function decodeAttr(value: string): string {
+  return value
+    .replace(/&quot;|&#0*34;/g, '"')
+    .replace(/&#0*39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
 function filterAttributes(tag: string, raw: string): string {
   const allowed = ALLOWED_ATTRS[tag];
   if (!allowed) return "";
@@ -90,7 +105,7 @@ function filterAttributes(tag: string, raw: string): string {
   while ((m = ATTR_RE.exec(raw))) {
     const name = m[1].toLowerCase();
     if (!allowed.has(name)) continue;
-    const value = (m[2] ?? m[3] ?? m[4] ?? "").trim();
+    const value = decodeAttr((m[2] ?? m[3] ?? m[4] ?? "").trim());
     if ((name === "href" || name === "src" || name === "cite") && !SAFE_URL.test(value)) continue;
     out.push(`${name}="${escapeAttr(value)}"`);
   }
