@@ -125,7 +125,7 @@ style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob: https://cdn.shopify.com https://www.googletagmanager.com https://*.google-analytics.com;
 font-src 'self' data:;
 connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com;
-frame-src 'none';
+frame-src https://www.youtube-nocookie.com https://player.vimeo.com;
 frame-ancestors 'none';
 form-action 'self';
 base-uri 'self';
@@ -161,6 +161,11 @@ What each non-`'self'` source is for:
 - **`connect-src` Google hosts** — GA4 beacons. There is deliberately **no** Shopify
   origin here: cart reads and writes are server actions that POST to this origin, and no
   client component fetches the Storefront API.
+- **`frame-src` YouTube and Vimeo players** — videos inserted into a News post with
+  Shopify's "Insert video" button. `src/lib/content-html.ts` never passes an authored
+  iframe through: it reads the video id and rebuilds the player from a fixed template
+  (YouTube on `youtube-nocookie.com`), and drops every other iframe. Page bodies do not
+  get even that. See `docs/news/README.md`.
 - **`form-action 'self'`** — the contact form and the cart drawer are server actions, and
   both search forms target `/search`. The Shopify checkout is an `<a href>` navigation
   from `CartDrawer`, which `form-action` does not govern, so no Shopify origin is needed.

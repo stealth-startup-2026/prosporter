@@ -65,3 +65,69 @@ test("drops a leading <h1> that repeats the page title", () => {
   assert.equal(dropLeadingTitle(html, "Refund Policy"), "<div><div></div><p>Body</p></div>");
   assert.equal(dropLeadingTitle("<h1>Welcome</h1><p>x</p>", "About"), "<h1>Welcome</h1><p>x</p>");
 });
+
+// ---------------------------------------------------------------- videos
+
+const YT = `<p><iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ?si=abc123" title="Finals day" frameborder="0" allow="accelerometer; autoplay" allowfullscreen></iframe></p>`;
+
+test("drops every iframe by default, video players included", () => {
+  assert.equal(sanitizeContentHtml(`<p>a</p>${YT}`), "<p>a</p>");
+});
+
+test("rebuilds a YouTube embed as a nocookie player when videos are on", () => {
+  const html = sanitizeContentHtml(`<p>a</p>${YT}`, { videos: true });
+  assert.equal(
+    html,
+    `<p>a</p><div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" title="Finals day" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`,
+  );
+});
+
+test("keeps an unlisted Vimeo hash and nothing else from the query", () => {
+  const html = sanitizeContentHtml(
+    `<iframe src="https://player.vimeo.com/video/76979871?h=8272103f6e&amp;autoplay=1" onload="x()"></iframe>`,
+    { videos: true },
+  );
+  assert.match(html, /src="https:\/\/player\.vimeo\.com\/video\/76979871\?h=8272103f6e"/);
+  assert.match(html, /title="Vimeo video"/);
+  assert.doesNotMatch(html, /autoplay=1|onload/);
+});
+
+test("still drops iframes from any other origin when videos are on", () => {
+  const html = sanitizeContentHtml(
+    `<p>x</p><iframe src="https://evil.example/embed/dQw4w9WgXcQ"></iframe><iframe src="https://www.google.com/maps/embed?pb=1"></iframe>`,
+    { videos: true },
+  );
+  assert.equal(html, "<p>x</p>");
+});
+
+test("escapes a hostile iframe title", () => {
+  const html = sanitizeContentHtml(
+    `<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title='"><script>alert(1)</script>'></iframe>`,
+    { videos: true },
+  );
+  assert.doesNotMatch(html, /<script/);
+  assert.match(html, /title="&quot;&gt;&lt;script&gt;/);
+});
+
+test("encodes attribute entities exactly once", () => {
+  assert.equal(
+    sanitizeContentHtml(`<a href="/search?q=a&amp;b=1">x</a><img src="/a.jpg" alt="Team &amp; coach" />`),
+    `<a href="/search?q=a&amp;b=1">x</a><img src="/a.jpg" alt="Team &amp; coach" />`,
+  );
+});
+
+test("never restores a video player inside an attribute value", () => {
+  const html = sanitizeContentHtml(
+    `<img src="/a.jpg" alt="<iframe src='https://www.youtube.com/embed/dQw4w9WgXcQ'></iframe>" />`,
+    { videos: true },
+  );
+  assert.doesNotMatch(html, /iframe|video-embed/);
+  assert.match(html, /^<img src="\/a\.jpg" alt="[^"]*" \/>$/);
+});
+
+test("placeholder characters in the input are dropped, not treated as players", () => {
+  for (const mark of ["", "", ""]) {
+    const html = sanitizeContentHtml(`<p>a${mark}7${mark}b</p>`, { videos: true });
+    assert.equal(html, "<p>a7b</p>");
+  }
+});

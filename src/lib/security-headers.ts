@@ -62,9 +62,12 @@ function cspDirectives(isDev: boolean): string[] {
     // ws: in development is the dev server's HMR socket.
     `connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com${isDev ? " ws: wss:" : ""}`,
 
-    // Nothing on this storefront embeds or is embedded. frame-ancestors is the
-    // modern half of the X-Frame-Options pair set below.
-    "frame-src 'none'",
+    // The only embeds are video players in News posts, which
+    // src/lib/content-html.ts rebuilds from a YouTube or Vimeo video id
+    // (youtube-nocookie.com: no cookies until play). Nothing else may be
+    // framed. Nothing may embed this storefront: frame-ancestors is the modern
+    // half of the X-Frame-Options pair set below.
+    "frame-src https://www.youtube-nocookie.com https://player.vimeo.com",
     "frame-ancestors 'none'",
 
     // Every <form> posts to this origin: the contact form and the cart drawer

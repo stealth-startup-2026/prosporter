@@ -21,6 +21,10 @@
  *      on WordPress CSS. `href`/`src` values are restricted to http(s), mailto,
  *      tel, fragments and site-relative paths.
  *
+ * News posts opt in to one exception (`{ videos: true }`): a YouTube or Vimeo
+ * iframe is rebuilt from its video id as a fixed, privacy-enhanced player
+ * instead of being dropped. See "videos" at the end of this file.
+ *
  * The result is inserted with `dangerouslySetInnerHTML`; step 2 and step 4 are
  * what make that safe for this content. It is a display-oriented cleaner for
  * first-party migrated copy, not a general-purpose sanitiser for user input.
@@ -81,6 +85,21 @@ function escapeAttr(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Attribute values arrive entity-encoded (`alt="Team &amp; coach"`, `?a=1&amp;b=2`).
+ * Decode the five XML entities first so `escapeAttr` encodes them exactly once;
+ * without this the browser shows a literal "&amp;" in alt text and breaks query
+ * strings. `&amp;` goes last so "&amp;lt;" stays the text "&lt;".
+ */
+function decodeAttr(value: string): string {
+  return value
+    .replace(/&quot;|&#0*34;/g, '"')
+    .replace(/&#0*39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
 function filterAttributes(tag: string, raw: string): string {
   const allowed = ALLOWED_ATTRS[tag];
   if (!allowed) return "";
@@ -90,7 +109,9 @@ function filterAttributes(tag: string, raw: string): string {
   while ((m = ATTR_RE.exec(raw))) {
     const name = m[1].toLowerCase();
     if (!allowed.has(name)) continue;
-    const value = (m[2] ?? m[3] ?? m[4] ?? "").trim();
+    // An iframe written inside an attribute value (`alt="<iframe …>"`) is still
+    // matched by `extractVideos`; its placeholder must not be restored there.
+    const value = decodeAttr((m[2] ?? m[3] ?? m[4] ?? "").replace(VIDEO_MARK_RE, "").trim());
     if ((name === "href" || name === "src" || name === "cite") && !SAFE_URL.test(value)) continue;
     out.push(`${name}="${escapeAttr(value)}"`);
   }
@@ -181,13 +202,33 @@ export function dropLeadingTitle(html: string, title: string): string {
   return m[1] + html.slice(m[0].length);
 }
 
-export function sanitizeContentHtml(html: string | null | undefined): string {
+export type SanitizeOptions = {
+  /**
+   * Keep YouTube and Vimeo players (News posts only; see `extractVideos`).
+   * Off for pages, whose migrated iframes are dead WordPress embeds.
+   */
+  videos?: boolean;
+};
+
+export function sanitizeContentHtml(
+  html: string | null | undefined,
+  { videos = false }: SanitizeOptions = {},
+): string {
   if (!html) return "";
 
   // 0. The legacy site footer copied into most page bodies (see above).
   // 1. HTML comments, including the `<!-- wp:... -->` / `<!-- /wp:... -->` pairs
   //    and any conditional comment. Also drops doctype/CDATA style declarations.
-  let out = stripLegacyFooter(html).replace(/<!--[\s\S]*?-->/g, "").replace(/<![\s\S]*?>/g, "");
+  //    The private-use placeholder characters (here and in `article-gallery.ts`)
+  //    are removed from the input first, so only our own placeholders exist.
+  let out = stripLegacyFooter(html.replace(PLACEHOLDER_CHARS, ""))
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<![\s\S]*?>/g, "");
+
+  // 1b. Recognised video players are swapped for a placeholder before step 2
+  //     drops every iframe, and rebuilt from the video id at the end.
+  const players = videos ? extractVideos(out) : null;
+  if (players) out = players.html;
 
   // 2. Scripts, styles, embeds, icon SVGs and forms, contents included.
   //
@@ -217,8 +258,101 @@ export function sanitizeContentHtml(html: string | null | undefined): string {
   out = collapseRepeatedImageLists(out);
   out = demoteSentenceHeadings(out);
 
+  if (players) out = restoreVideos(out, players.videos);
+
   // Collapse the whitespace the page builder left between nested wrappers.
   return out.replace(/[ \t]*\n[ \t\n]*/g, "\n").trim();
+}
+
+// ------------------------------------------------------------------ videos
+
+/**
+ * Video in News posts. Shopify's post editor has an "Insert video" button that
+ * takes a YouTube or Vimeo link or embed code and stores an `<iframe>` in the
+ * article body. Every other iframe is still dropped with its contents (step 2).
+ *
+ * The player is never copied through as authored: only the provider and the
+ * video id are read from the `src`, and the iframe is rebuilt from a fixed
+ * template. YouTube plays from `youtube-nocookie.com` (no cookies until the
+ * viewer presses play). The CSP's `frame-src` allows exactly these two player
+ * origins (`src/lib/security-headers.ts`). `allow` only delegates features the
+ * page's own Permissions-Policy does not deny, so the browser logs no
+ * permissions warnings; fullscreen is granted there too, not with the legacy
+ * `allowfullscreen` attribute (Chrome warns when both are present).
+ */
+type Video = { provider: "youtube" | "vimeo"; id: string; hash: string | null; title: string };
+
+const VIDEO_MARK = "\uE003";
+const VIDEO_MARK_RE = new RegExp(`${VIDEO_MARK}\\d*${VIDEO_MARK}?`, "g");
+/** Every placeholder used by this module and `article-gallery.ts`. */
+const PLACEHOLDER_CHARS = /[\uE001-\uE003]/g;
+const IFRAME_RE = /<iframe\b((?:"[^"]*"|'[^']*'|[^"'>])*)>[\s\S]*?<\/iframe\s*>/gi;
+const YOUTUBE_SRC =
+  /^(?:https?:)?\/\/(?:www\.)?(?:youtube\.com|youtube-nocookie\.com)\/embed\/([A-Za-z0-9_-]{11})(?:[?#].*)?$/i;
+const VIMEO_SRC = /^(?:https?:)?\/\/player\.vimeo\.com\/video\/(\d{1,12})(?:\?(.*))?$/i;
+
+function attrValue(raw: string, name: string): string | null {
+  ATTR_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ATTR_RE.exec(raw))) {
+    if (m[1].toLowerCase() === name) return (m[2] ?? m[3] ?? m[4] ?? "").trim();
+  }
+  return null;
+}
+
+function parseVideo(rawAttrs: string): Video | null {
+  const src = (attrValue(rawAttrs, "src") ?? "").replace(/&amp;/g, "&");
+  const title = (attrValue(rawAttrs, "title") ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+  const youtube = YOUTUBE_SRC.exec(src);
+  if (youtube) return { provider: "youtube", id: youtube[1], hash: null, title: title || "YouTube video" };
+  const vimeo = VIMEO_SRC.exec(src);
+  if (vimeo) {
+    // Unlisted Vimeo videos need their privacy hash: `?h=0123abcd`.
+    const hash = new URLSearchParams(vimeo[2] ?? "").get("h");
+    return {
+      provider: "vimeo",
+      id: vimeo[1],
+      hash: hash && /^[0-9a-f]{6,32}$/i.test(hash) ? hash : null,
+      title: title || "Vimeo video",
+    };
+  }
+  return null;
+}
+
+function extractVideos(html: string): { html: string; videos: Video[] } {
+  const videos: Video[] = [];
+  const out = html.replace(IFRAME_RE, (iframe, rawAttrs: string) => {
+    const video = parseVideo(rawAttrs);
+    if (!video) return iframe;
+    videos.push(video);
+    return `${VIDEO_MARK}${videos.length - 1}${VIDEO_MARK}`;
+  });
+  return { html: out, videos };
+}
+
+function playerHtml(video: Video): string {
+  const src =
+    video.provider === "youtube"
+      ? `https://www.youtube-nocookie.com/embed/${video.id}`
+      : `https://player.vimeo.com/video/${video.id}${video.hash ? `?h=${video.hash}` : ""}`;
+  return (
+    `<div class="video-embed"><iframe src="${src}" title="${escapeAttr(video.title)}" loading="lazy" ` +
+    `allow="autoplay; encrypted-media; picture-in-picture; fullscreen" ` +
+    `referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+  );
+}
+
+function restoreVideos(html: string, videos: Video[]): string {
+  const mark = `${VIDEO_MARK}(\\d+)${VIDEO_MARK}`;
+  const player = (n: string) => {
+    const video = videos[Number(n)];
+    return video ? playerHtml(video) : "";
+  };
+  return html
+    // A player alone in a paragraph or wrapper replaces the wrapper, so a block
+    // never ends up inside a <p>.
+    .replace(new RegExp(`<(p|div)>\\s*${mark}\\s*<\\/\\1>`, "g"), (_m, _tag, n: string) => player(n))
+    .replace(new RegExp(mark, "g"), (_m, n: string) => player(n));
 }
 
 /** Plain text from HTML, for metadata descriptions and excerpts. */

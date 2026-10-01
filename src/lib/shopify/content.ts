@@ -13,10 +13,11 @@ import "server-only";
  *   Article { title handle contentHtml excerpt publishedAt authorV2 image seo tags }
  *
  * `Article.author` does not exist in 2026-07 — only `authorV2` (ArticleAuthor).
- * Reads use `force-cache` with the tags in `tags.ts` and CATALOG_REVALIDATE_SECONDS.
+ * Reads use `force-cache` with the tags in `tags.ts`: CATALOG_REVALIDATE_SECONDS
+ * for pages, ARTICLE_REVALIDATE_SECONDS (5 min) for articles.
  */
 import { shopifyFetch } from "./client";
-import { CACHE_TAGS, CATALOG_REVALIDATE_SECONDS } from "./tags";
+import { ARTICLE_REVALIDATE_SECONDS, CACHE_TAGS, CATALOG_REVALIDATE_SECONDS } from "./tags";
 import type { ArticleCard, ContentArticle, ContentPage } from "./content-types";
 import type { Connection } from "./types";
 
@@ -135,6 +136,7 @@ const GET_ARTICLE_HANDLES = /* GraphQL */ `
           node {
             handle
             publishedAt
+            tags
           }
         }
         ${PAGE_INFO}
@@ -196,7 +198,7 @@ export async function getBlogArticles(
     query: GET_BLOG_ARTICLES,
     variables: { blogHandle, first: Math.min(first, PAGE_SIZE) },
     tags: [CACHE_TAGS.articles],
-    revalidate: CATALOG_REVALIDATE_SECONDS,
+    revalidate: ARTICLE_REVALIDATE_SECONDS,
   });
   if (!data.blog) return [];
   return data.blog.articles.edges.map((e) => e.node).filter((a) => !isDuplicateHandle(a.handle));
@@ -210,7 +212,7 @@ export async function getArticle(
     query: GET_ARTICLE_BY_HANDLE,
     variables: { blogHandle, handle },
     tags: [CACHE_TAGS.articles, CACHE_TAGS.article(handle)],
-    revalidate: CATALOG_REVALIDATE_SECONDS,
+    revalidate: ARTICLE_REVALIDATE_SECONDS,
   });
   return data.blog?.articleByHandle ?? null;
 }
@@ -218,8 +220,8 @@ export async function getArticle(
 /** Every article handle in the blog, duplicates included. Walks all pages. */
 export async function getAllArticleHandles(
   blogHandle: string = DEFAULT_BLOG_HANDLE,
-): Promise<{ handle: string; publishedAt: string }[]> {
-  type Node = { handle: string; publishedAt: string };
+): Promise<{ handle: string; publishedAt: string; tags: string[] }[]> {
+  type Node = { handle: string; publishedAt: string; tags: string[] };
   const all: Node[] = [];
   let after: string | null = null;
   do {
@@ -227,7 +229,7 @@ export async function getAllArticleHandles(
       query: GET_ARTICLE_HANDLES,
       variables: { blogHandle, first: PAGE_SIZE, after },
       tags: [CACHE_TAGS.articles],
-      revalidate: CATALOG_REVALIDATE_SECONDS,
+      revalidate: ARTICLE_REVALIDATE_SECONDS,
     });
     if (!data.blog) return all;
     all.push(...data.blog.articles.edges.map((e) => e.node));

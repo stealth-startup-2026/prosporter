@@ -20,3 +20,13 @@ export const CACHE_TAGS = {
 
 /** Default revalidation window for catalog reads, in seconds. */
 export const CATALOG_REVALIDATE_SECONDS = 60 * 60;
+
+/**
+ * Revalidation window for blog articles (the News section), in seconds.
+ *
+ * The webhook receiver only maps product, collection and inventory topics
+ * (`docs/webhooks.md`), so a post published in Shopify admin reaches `/blog`
+ * on time alone. An hour read as "my post never showed up"; five minutes keeps
+ * that wait short for one cached Storefront read per query per five minutes.
+ */
+export const ARTICLE_REVALIDATE_SECONDS = 5 * 60;
