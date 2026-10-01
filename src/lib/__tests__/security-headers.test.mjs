@@ -49,7 +49,7 @@ test("Permissions-Policy denies the sensitive features and the topics API", () =
   }
 });
 
-test("the production policy allows GA4 and Shopify images and nothing else", () => {
+test("the production policy allows GA4, Shopify images and the video players, nothing else", () => {
   const csp = parse(contentSecurityPolicy(false));
 
   assert.deepEqual(csp["default-src"], ["'self'"]);
@@ -57,6 +57,8 @@ test("the production policy allows GA4 and Shopify images and nothing else", () 
   assert.deepEqual(csp["base-uri"], ["'self'"]);
   // Clickjacking: the CSP half of the X-Frame-Options pair.
   assert.deepEqual(csp["frame-ancestors"], ["'none'"]);
+  // News post videos are the only frames: the two player origins, nothing broader.
+  assert.deepEqual(csp["frame-src"], ["https://www.youtube-nocookie.com", "https://player.vimeo.com"]);
   // Checkout is a link navigation, not a form post, so no Shopify origin here.
   assert.deepEqual(csp["form-action"], ["'self'"]);
   assert.ok("upgrade-insecure-requests" in csp);
