@@ -35,6 +35,7 @@ export function Header() {
     <>
       <header
         data-site-header
+        data-modal-background
         className="sticky top-0 z-50 border-b border-line bg-paper/95 backdrop-blur transition-shadow"
       >
         <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">

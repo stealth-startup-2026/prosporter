@@ -46,6 +46,7 @@ export function MobileMenuPanel({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={rootRef}
+      data-modal-background
       className={`fixed inset-0 z-[90] lg:hidden ${open ? "" : "pointer-events-none"}`}
       inert={!open}
     >
