@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 /**
  * The modal-dialog behaviour shared by the cart drawer, the mobile filter sheet
@@ -55,6 +55,13 @@ export function useModalDialog({
   inertSiblings = false,
   openerRef,
 }: ModalDialogOptions): void {
+  // Read through a ref so a caller passing a new `onClose` each render does not
+  // re-run the setup below (which moves focus and toggles `inert` on siblings).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
@@ -86,7 +93,7 @@ export function useModalDialog({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -122,5 +129,5 @@ export function useModalDialog({
       for (const el of inerted) el.removeAttribute("inert");
       opener?.focus({ preventScroll: true });
     };
-  }, [open, onClose, panelRef, rootRef, inertSiblings, openerRef]);
+  }, [open, panelRef, rootRef, inertSiblings, openerRef]);
 }
