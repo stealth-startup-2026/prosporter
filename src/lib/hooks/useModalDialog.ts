@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 /**
  * The modal-dialog behaviour shared by the cart drawer, the mobile filter sheet
@@ -17,10 +17,19 @@ import { useEffect, type RefObject } from "react";
  *  - trap Tab / Shift+Tab inside the panel and pull focus back if it escapes;
  *  - close on Escape;
  *  - lock body scroll;
- *  - optionally mark every sibling of the dialog root `inert` (background out of
- *    the tab order and hidden from assistive tech);
+ *  - optionally mark the page's own background regions `inert` (out of the tab
+ *    order and hidden from assistive tech) — only siblings of the dialog root
+ *    that carry `data-modal-background`, never nodes the app did not render
+ *    (browser-extension hosts, Next's route announcer, scripts);
  *  - undo all of it on close and return focus to the opener.
  */
+
+/**
+ * Opt-in marker for body-level regions an open modal may inert: the skip link,
+ * header, main, footer and the other off-canvas roots. Anything else at body
+ * level (extension UI, `next-route-announcer`, scripts) is left untouched.
+ */
+export const MODAL_BACKGROUND_ATTR = "data-modal-background";
 
 /** Everything a shopper can Tab to inside a panel, in DOM order. */
 export const MODAL_FOCUSABLE =
@@ -38,7 +47,10 @@ export type ModalDialogOptions = {
    * `inertSiblings` is on: its siblings are what gets inerted.
    */
   rootRef?: RefObject<HTMLElement | null>;
-  /** Mark every sibling of `rootRef` inert while open. Default false. */
+  /**
+   * Mark the siblings of `rootRef` that carry `data-modal-background` inert
+   * while open. Default false.
+   */
   inertSiblings?: boolean;
   /**
    * The control focus should return to. Defaults to whatever was focused when
@@ -55,6 +67,13 @@ export function useModalDialog({
   inertSiblings = false,
   openerRef,
 }: ModalDialogOptions): void {
+  // Read through a ref so a caller passing a new `onClose` each render does not
+  // re-run the setup below (which moves focus and toggles `inert` on siblings).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
@@ -68,13 +87,16 @@ export function useModalDialog({
     document.body.style.overflow = "hidden";
 
     // Background is inert while the dialog is open (blocks pointer, focus and
-    // AT). Siblings that are already inert — a closed drawer sitting off-canvas
-    // — are left alone so we never clear someone else's attribute.
+    // AT). Only the app's own regions are touched: inerting a node injected by
+    // a browser extension can strand that extension's focus or measuring code.
+    // Siblings that are already inert — a closed drawer sitting off-canvas —
+    // are left alone so we never clear someone else's attribute.
     const inerted: HTMLElement[] = [];
     const root = rootRef?.current ?? null;
     if (inertSiblings && root?.parentElement) {
       for (const sibling of Array.from(root.parentElement.children)) {
         if (sibling === root || !(sibling instanceof HTMLElement)) continue;
+        if (!sibling.hasAttribute(MODAL_BACKGROUND_ATTR)) continue;
         if (sibling.hasAttribute("inert")) continue;
         sibling.setAttribute("inert", "");
         inerted.push(sibling);
@@ -86,7 +108,7 @@ export function useModalDialog({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -122,5 +144,5 @@ export function useModalDialog({
       for (const el of inerted) el.removeAttribute("inert");
       opener?.focus({ preventScroll: true });
     };
-  }, [open, onClose, panelRef, rootRef, inertSiblings, openerRef]);
+  }, [open, panelRef, rootRef, inertSiblings, openerRef]);
 }
