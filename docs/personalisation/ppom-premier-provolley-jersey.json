@@ -1,0 +1,489 @@
+[
+ {
+  "type": "text",
+  "title": "Last Name (Back of Jersey)",
+  "data_name": "last_name",
+  "description": "",
+  "placeholder": "Enter your last name (CAPITAL LETTERS)",
+  "error_message": "Please enter your last name to be printed on the jersey.",
+  "maxlength": "",
+  "minlength": "",
+  "default_value": "",
+  "price": "",
+  "class": "",
+  "input_mask": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "required": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "is_provolley_player",
+     "operators": "any",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "text"
+ },
+ {
+  "type": "select",
+  "title": "Do you play Premier League Volley 2026/2027 for ProVolley?",
+  "data_name": "is_provolley_player",
+  "description": "",
+  "error_message": "",
+  "options": [
+   {
+    "option": "No",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "no"
+   },
+   {
+    "option": "Yes",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "yes"
+   }
+  ],
+  "selected": "",
+  "first_option": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "required": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "last_name",
+     "operators": "is",
+     "element_values": "",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "select"
+ },
+ {
+  "type": "select",
+  "title": "Do you play U19 Division?",
+  "data_name": "is_u19",
+  "description": "",
+  "error_message": "",
+  "options": [
+   {
+    "option": "No",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "no"
+   },
+   {
+    "option": "Yes",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "yes"
+   }
+  ],
+  "selected": "",
+  "first_option": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "is_provolley_player",
+     "operators": "is",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "select"
+ },
+ {
+  "type": "select",
+  "title": "Do you play a Senior Division?",
+  "data_name": "plays_senior",
+  "description": "",
+  "error_message": "",
+  "options": [
+   {
+    "option": "No",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "no"
+   },
+   {
+    "option": "Yes",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "yes"
+   }
+  ],
+  "selected": "",
+  "first_option": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "is_provolley_player",
+     "operators": "is",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "select"
+ },
+ {
+  "type": "select",
+  "title": "Select your Senior team",
+  "data_name": "senior_team",
+  "description": "",
+  "error_message": "",
+  "options": [
+   {
+    "option": "Reserves",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "reserves"
+   },
+   {
+    "option": "Premier",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "premier"
+   }
+  ],
+  "selected": "",
+  "first_option": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "plays_senior",
+     "operators": "is",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "select"
+ },
+ {
+  "type": "number",
+  "title": "Enter your preferred jersey number",
+  "data_name": "external_number",
+  "description": "",
+  "placeholder": "Enter a number between 1 and 99",
+  "error_message": "",
+  "max": "99",
+  "min": "1",
+  "step": "",
+  "default_value": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "required": "on",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "is_provolley_player",
+     "operators": "is",
+     "element_values": "No",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "number"
+ },
+ {
+  "type": "select",
+  "title": "Has your jersey number been confirmed by the Club?",
+  "data_name": "number_confirmed",
+  "description": "",
+  "error_message": "",
+  "options": [
+   {
+    "option": "No",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "no"
+   },
+   {
+    "option": "Yes",
+    "price": "",
+    "weight": "",
+    "stock": "",
+    "id": "yes"
+   }
+  ],
+  "selected": "",
+  "first_option": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "Any",
+   "rules": [
+    {
+     "elements": "is_u19",
+     "operators": "is",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    },
+    {
+     "elements": "plays_senior",
+     "operators": "is",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "select"
+ },
+ {
+  "type": "number",
+  "title": "Enter your confirmed jersey number",
+  "data_name": "confirmed_number",
+  "description": "",
+  "placeholder": "",
+  "error_message": "Please enter your confirmed jersey number (1-60)",
+  "max": "",
+  "min": "",
+  "step": "",
+  "default_value": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "required": "on",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "number_confirmed",
+     "operators": "is",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    },
+    {
+     "elements": "number_confirmed",
+     "operators": "is",
+     "element_values": "Yes",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "number"
+ },
+ {
+  "type": "number",
+  "title": "Jersey Number Preference #1",
+  "data_name": "pref_1",
+  "description": "",
+  "placeholder": "",
+  "error_message": "Please enter your first jersey number preference (1-60)",
+  "max": "",
+  "min": "",
+  "step": "",
+  "default_value": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "required": "on",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "number_confirmed",
+     "operators": "is",
+     "element_values": "No",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "number"
+ },
+ {
+  "type": "number",
+  "title": "Jersey Number Preference #2",
+  "data_name": "pref_2",
+  "description": "",
+  "placeholder": "",
+  "error_message": "Please enter your second jersey number preference (1-60)",
+  "max": "",
+  "min": "",
+  "step": "",
+  "default_value": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "required": "on",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "number_confirmed",
+     "operators": "is",
+     "element_values": "No",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "number"
+ },
+ {
+  "type": "number",
+  "title": "Jersey Number Preference #3",
+  "data_name": "pref_3",
+  "description": "",
+  "placeholder": "",
+  "error_message": "Please enter your third jersey number preference (1-60)",
+  "max": "",
+  "min": "",
+  "step": "",
+  "default_value": "",
+  "class": "",
+  "width": "12",
+  "visibility": "everyone",
+  "visibility_role": "",
+  "required": "on",
+  "logic": "on",
+  "conditions": {
+   "visibility": "Show",
+   "bound": "All",
+   "rules": [
+    {
+     "elements": "number_confirmed",
+     "operators": "is",
+     "element_values": "No",
+     "element_constant": "",
+     "cond-between-interval": {
+      "from": "",
+      "to": ""
+     }
+    }
+   ]
+  },
+  "status": "on",
+  "ppom_id": "1",
+  "field_type": "number"
+ }
+]
