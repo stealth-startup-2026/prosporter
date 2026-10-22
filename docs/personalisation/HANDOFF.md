@@ -1,6 +1,6 @@
 # Handoff: jersey personalisation (for Kevin)
 
-Prepared by Violet (purpl), 23 Oct 2026. Branch `feat/jersey-personalisation`.
+Prepared by Violet (purpl), 23 Oct 2026. Branch `feat/jersey-personalisation`, PR #6.
 Code is done and checked; what's left needs the Shopify store and your eyes on a preview.
 
 ## What Mladen asked for
@@ -43,7 +43,7 @@ Files: `src/lib/personalisation.ts` (rules), `src/components/product/Personalisa
 
 ## To finish (in order)
 
-1. **Open the PR's Vercel preview** (stealthstartup2026 account) and go to
+1. **Open PR #6's Vercel preview** (stealthstartup2026 account) and go to
    `/product/provolley-mens-volleyball-jersey-sydney`. Pick a size and colour, answer
    the questions as a junior U17 player with an unconfirmed number, add to bag.
 2. **Check the bag drawer** shows a line like
