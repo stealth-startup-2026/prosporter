@@ -29,6 +29,7 @@ import {
 import type { CartWarning } from "@/lib/shopify";
 import type { Cart } from "@/lib/shopify/types";
 import { errorFields, log } from "@/lib/log";
+import { sanitiseLineAttributes, type LineAttribute } from "@/lib/cart-attributes";
 
 /** Name is public (it ships in Set-Cookie); the value is an opaque Shopify gid. */
 const COOKIE_NAME = "prosporter_cart";
@@ -165,15 +166,32 @@ export async function getCurrentCart(): Promise<Cart | null> {
   }
 }
 
-/** Add a variant, creating the cart lazily on the first add. */
-export async function addToCart(variantId: string, quantity = 1): Promise<CartActionResult> {
+/**
+ * Add a variant, creating the cart lazily on the first add.
+ *
+ * `attributes` are line-item properties (jersey personalisation: club, team,
+ * number). Shopify keeps a line per distinct attribute set, so two jerseys with
+ * different numbers stay separate lines, and every answer shows on the order.
+ */
+export async function addToCart(
+  variantId: string,
+  quantity = 1,
+  attributes: LineAttribute[] = [],
+): Promise<CartActionResult> {
   if (!isShopifyConfigured()) return disabled();
   const requestId = randomUUID();
   if (!isGid(variantId)) {
     log.warn("cart.bad_input", { requestId, op: "addToCart" });
     return { cart: null, error: "That item is no longer available.", enabled: true };
   }
-  const lines = [{ merchandiseId: variantId, quantity: clampQuantity(quantity) }];
+  const safeAttributes = sanitiseLineAttributes(attributes);
+  const lines = [
+    {
+      merchandiseId: variantId,
+      quantity: clampQuantity(quantity),
+      ...(safeAttributes.length ? { attributes: safeAttributes } : {}),
+    },
+  ];
   const existingId = await readCartId();
 
   if (existingId) {
