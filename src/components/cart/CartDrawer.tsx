@@ -9,6 +9,7 @@ import { useModalDialog } from "@/lib/hooks/useModalDialog";
 import { stockCeiling } from "@/lib/cart-quantity";
 import { CloseIcon, PlusIcon, MinusIcon, ArrowRight, ChevronDown } from "@/components/icons";
 import type { CartLine } from "@/lib/shopify/types";
+import { summariseAttributes } from "@/lib/personalisation";
 
 const FREE_SHIP_THRESHOLD = 150;
 
@@ -327,6 +328,8 @@ export function CartDrawer() {
               {lines.map((line) => {
                 const image = lineImage(line);
                 const summary = variantSummary(line);
+                // Jersey personalisation answers travel as line attributes.
+                const personalisation = summariseAttributes(line.attributes ?? []);
                 const title = line.merchandise.product.title;
                 const name = summary ? `${title} (${summary})` : title;
                 // Cap the "+" at available stock so the drawer can't push a line
@@ -365,6 +368,9 @@ export function CartDrawer() {
                         </p>
                       </div>
                       {summary && <p className="mt-0.5 text-xs text-muted">{summary}</p>}
+                      {personalisation && (
+                        <p className="mt-0.5 text-xs text-muted">{personalisation}</p>
+                      )}
                       {!line.merchandise.availableForSale ? (
                         <p className="mt-0.5 text-xs text-subtle">Out of stock</p>
                       ) : (

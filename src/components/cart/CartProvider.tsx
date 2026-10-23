@@ -16,6 +16,7 @@ import type { Cart, CartLine } from "@/lib/shopify/types";
 import { nodes } from "@/lib/shopify/types";
 import { appliedDiscountCodes, cartDiscountAmount, cartTotals } from "@/lib/cart-totals";
 import { addToCartParams, findLineByVariant, track } from "@/lib/analytics";
+import type { LineAttribute } from "@/lib/cart-attributes";
 import {
   addToCart,
   applyDiscountCode as applyDiscountCodeAction,
@@ -142,7 +143,8 @@ type CartContextValue = {
   open: () => void;
   close: () => void;
   dismissError: () => void;
-  addVariant: (variantId: string, quantity?: number) => void;
+  /** `attributes` become line-item properties (jersey personalisation). */
+  addVariant: (variantId: string, quantity?: number, attributes?: LineAttribute[]) => void;
   setQty: (lineId: string, quantity: number) => void;
   remove: (lineId: string) => void;
   applyDiscount: (code: string) => void;
@@ -225,10 +227,10 @@ export function CartProvider({
       open,
       close,
       dismissError,
-      addVariant: (variantId, quantity = 1) => {
+      addVariant: (variantId, quantity = 1, attributes = []) => {
         setOpen(true);
         run(async () => {
-          const result = await addToCart(variantId, quantity);
+          const result = await addToCart(variantId, quantity, attributes);
           // GA4 add_to_cart (CLNT-179): only on a successful server action, and
           // only for the line Shopify actually returned, so a rejected add or a
           // sold-out variant never reports a sale that did not happen. The

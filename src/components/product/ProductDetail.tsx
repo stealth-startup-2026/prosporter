@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -13,6 +13,13 @@ import { clampQuantity, isLowStock, maxAddable, stockCeiling } from "@/lib/cart-
 import { useCart } from "@/components/cart/CartProvider";
 import { track, viewItemParams } from "@/lib/analytics";
 import { PLACEHOLDER_IMAGE } from "@/components/product/placeholder";
+import { PersonalisationForm, personalisationFieldId } from "@/components/product/PersonalisationForm";
+import {
+  personalisationAttributes,
+  personalisationFor,
+  validatePersonalisation,
+  type PersonalisationAnswers,
+} from "@/lib/personalisation";
 import { CheckIcon, ChevronDown, MinusIcon, PlusIcon } from "@/components/icons";
 
 /** Disclosure: button and panel wired together with aria-expanded/controls. */
@@ -89,6 +96,23 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
   const [quantity, setQuantity] = useState(1);
   const uid = useId();
   const hintId = `pdp-hint-${uid}`;
+  const persPrefix = `pdp-pers-${uid}`;
+
+  /**
+   * Jersey personalisation (club / team / number). The tree depends only on
+   * the product; answers live here so "Add to bag" can validate them and send
+   * them as line attributes. Errors stay hidden until the first attempt so the
+   * form does not open covered in red.
+   */
+  const personalisation = useMemo(() => personalisationFor(product), [product]);
+  const [answers, setAnswers] = useState<PersonalisationAnswers>({});
+  const [showPersErrors, setShowPersErrors] = useState(false);
+  const persErrors = useMemo(
+    () => (personalisation ? validatePersonalisation(personalisation, answers) : {}),
+    [personalisation, answers],
+  );
+  const persRef = useRef<HTMLDivElement | null>(null);
+  const answer = (key: string, value: string) => setAnswers((a) => ({ ...a, [key]: value }));
   const qtyId = `pdp-qty-${uid}`;
   const stockHintId = `pdp-stock-${uid}`;
 
@@ -183,8 +207,19 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
     // Belt and braces: the button is disabled in this state, so this only
     // guards a programmatic click.
     if (!addable) return;
+    if (personalisation) {
+      const firstInvalid = personalisation.fields.find((f) => persErrors[f.key]);
+      if (firstInvalid) {
+        setShowPersErrors(true);
+        persRef.current
+          ?.querySelector<HTMLElement>(`#${CSS.escape(personalisationFieldId(persPrefix, firstInvalid.key))}`)
+          ?.focus();
+        return;
+      }
+    }
+    const attributes = personalisation ? personalisationAttributes(personalisation, answers) : [];
     if (variantId) {
-      addVariant(variantId, qty);
+      addVariant(variantId, qty, attributes);
     } else {
       // Mock catalog: no Shopify variant to add, so the drawer shim runs.
       add({
@@ -417,6 +452,21 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
           <p id={hintId} className="mt-3 text-xs font-medium text-muted">
             {chooseHint} to add this to your bag.
           </p>
+        )}
+
+        {/* Club jersey questions, answered before the quantity and the button
+            so the page reads top to bottom: what, for whom, how many. */}
+        {personalisation && (
+          <div ref={persRef}>
+            <PersonalisationForm
+              tree={personalisation}
+              answers={answers}
+              errors={persErrors}
+              showErrors={showPersErrors}
+              idPrefix={persPrefix}
+              onChange={answer}
+            />
+          </div>
         )}
 
         {/* Quantity stepper — real number input flanked by −/+ buttons, styled
