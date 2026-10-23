@@ -72,7 +72,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-paper text-ink">
         {/* Bypass Blocks (WCAG 2.4.1): first focusable element on every page,
             off-screen until it takes focus. Targets the one <main> landmark. */}
-        <a href="#main" className="skip-link">
+        <a href="#main" className="skip-link" data-modal-background>
           Skip to content
         </a>
         {/* Site-wide structured data: the Organization every other node points
@@ -89,7 +89,12 @@ export default function RootLayout({
           {/* tabIndex={-1} so the skip link can move real focus here, not just
               the scroll position; scroll-margin keeps it clear of the sticky
               header (2.4.11 Focus Not Obscured). */}
-          <main id="main" tabIndex={-1} className="flex-1 scroll-mt-24 outline-none">
+          <main
+            id="main"
+            tabIndex={-1}
+            className="flex-1 scroll-mt-24 outline-none"
+            data-modal-background
+          >
             {children}
           </main>
           <Footer />

@@ -191,6 +191,13 @@ export function CartProvider({
     [applyOptimistic],
   );
 
+  // Stable identities: the drawer hands `close` to useModalDialog, and a fresh
+  // function per cart update would tear the modal down and rebuild it (refocus,
+  // re-inert every sibling) on every optimistic change and transition flip.
+  const open = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  const dismissError = useCallback(() => setError(null), []);
+
   const fetchedOnMount = useRef(false);
   useEffect(() => {
     if (!enabled || initialCart || fetchedOnMount.current) return;
@@ -217,9 +224,9 @@ export function CartProvider({
       isPending,
       error: error?.message ?? null,
       errorSource: error?.source ?? "cart",
-      open: () => setOpen(true),
-      close: () => setOpen(false),
-      dismissError: () => setError(null),
+      open,
+      close,
+      dismissError,
       addVariant: (variantId, quantity = 1, attributes = []) => {
         setOpen(true);
         run(async () => {
@@ -250,9 +257,9 @@ export function CartProvider({
         run(() => applyDiscountCodeAction(code), { source: "discount" }),
       refresh: () =>
         run(async () => ({ cart: await getCurrentCart(), error: null })),
-      add: () => setOpen(true),
+      add: open,
     };
-  }, [optimisticCart, enabled, isOpen, isPending, error, run]);
+  }, [optimisticCart, enabled, isOpen, isPending, error, run, open, close, dismissError]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

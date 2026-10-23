@@ -206,6 +206,7 @@ export function CartDrawer() {
   return (
     <div
       ref={rootRef}
+      data-modal-background
       className={`fixed inset-0 z-[100] ${isOpen ? "" : "pointer-events-none"}`}
       inert={!isOpen}
     >
