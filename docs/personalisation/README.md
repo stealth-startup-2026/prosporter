@@ -45,6 +45,25 @@ independent). Error text on Q8 to Q11 says the number range is 1-60.
 | 8 | Enter your confirmed jersey number | confirmed_number | number | | yes | Q7 = Yes |
 | 9-11 | Jersey Number Preference #1, #2, #3 | pref_1..3 | number | | yes | Q7 = No |
 
+## Changes agreed with Mladen (WhatsApp, 23 Oct 2026)
+
+The site no longer copies the old forms exactly:
+
+- **Number ranges:** team numbers (confirmed number, preferences #1-#3) are 1-60 on
+  every jersey. Anyone not in a team picks 1-99. The old club jerseys capped
+  non-members at 45 while the field's own placeholder said "between 1 and 99"; 99 it is.
+  The confirmed #98 on a Premier order was a casual outside buyer, not a team number.
+- **Club player in no team** (Junior No and Senior No) is now asked for a preferred
+  number (1-99). The old site asked nothing.
+- **Premier jersey:** Q3-Q5 are replaced by one required question, "Select your team":
+  U19 / Reserves / Premier. A player in two teams buys a second jersey. The number
+  questions show for every Premier League player.
+- **Kids jersey (Tree C, new):** ProVolley kids jerseys (e.g. Kids Original Jersey 2022
+  Edition) get the club flow with the kids' teams: ProVolley player? → Select your team
+  (Beginner / Intermediate / Advance) → number confirmed? → confirmed number or three
+  preferences (1-60). Non-members give a preferred number (1-99).
+- **Checkout-level fields** below are not needed any more.
+
 ## Checkout-level fields (not PPOM, Flexible Checkout Fields style)
 
 Seen in order meta in the 5 Sep 2026 export, so they were asked at checkout, not on the product:

@@ -9,8 +9,11 @@
  * line in Shopify admin ("Club player: Yes · Junior division: U17 · …"), which
  * is what lets staff tag jersey orders without asking the buyer afterwards.
  *
- * The two trees and their show/hide rules are a faithful copy of the old site:
- * see docs/personalisation/README.md (recovered from Wayback snapshots).
+ * The club and Premier trees started as a copy of the old site (see
+ * docs/personalisation/README.md, recovered from Wayback snapshots) and were
+ * adjusted with Mladen on 23 Oct 2026: a single team question on the Premier
+ * jersey, a number for club players in no team, 1-99 for anyone not in a
+ * team, and a Kids tree.
  */
 
 export type PersonalisationRule = { field: string; equals: string };
@@ -38,7 +41,7 @@ export type PersonalisationField = {
 };
 
 export type PersonalisationTree = {
-  id: "club" | "premier";
+  id: "club" | "premier" | "kids";
   /** Club named in the first question, for the heading. */
   club: string;
   fields: PersonalisationField[];
@@ -49,9 +52,9 @@ export type PersonalisationAnswers = Record<string, string>;
 export const YES = "Yes";
 export const NO = "No";
 
-/** Old site's limit on club numbers ("Please enter your confirmed jersey number (1-60)"). */
+/** Team numbers, assigned by the club ("Please enter your confirmed jersey number (1-60)"). */
 const CLUB_NUMBER = { min: 1, max: 60 };
-/** Non-members printed any number; keep two digits. */
+/** Anyone not in a team (non-members, members in no team) picks any two-digit number. */
 const ANY_NUMBER = { min: 1, max: 99 };
 
 const numberField = (
@@ -72,6 +75,47 @@ const numberField = (
 });
 
 /**
+ * The number questions every tree ends with, for shoppers in a team: has the
+ * club confirmed a number, then the number or three preferences (all 1-60).
+ */
+function teamNumberFields(confirmedWhen: PersonalisationField["showWhen"]): PersonalisationField[] {
+  return [
+    {
+      key: "numberConfirmed",
+      label: "Has your jersey number been confirmed by the Club?",
+      attribute: "Number confirmed by club",
+      type: "select",
+      options: [NO, YES],
+      required: true,
+      showWhen: confirmedWhen,
+      error: "Yes or No",
+    },
+    numberField("confirmedNumber", "Enter your confirmed jersey number", "Confirmed number", CLUB_NUMBER, {
+      all: [{ field: "numberConfirmed", equals: YES }],
+    }),
+    numberField("pref1", "Jersey number preference #1", "Number preference 1", CLUB_NUMBER, {
+      all: [{ field: "numberConfirmed", equals: NO }],
+    }),
+    numberField("pref2", "Jersey number preference #2", "Number preference 2", CLUB_NUMBER, {
+      all: [{ field: "numberConfirmed", equals: NO }],
+    }),
+    numberField("pref3", "Jersey number preference #3", "Number preference 3", CLUB_NUMBER, {
+      all: [{ field: "numberConfirmed", equals: NO }],
+    }),
+  ];
+}
+
+const playerField = (club: string): PersonalisationField => ({
+  key: "player",
+  label: `Are you ${/^[aeiou]/i.test(club) ? "an" : "a"} ${club} player?`,
+  attribute: "Club player",
+  type: "select",
+  options: [YES, NO],
+  required: true,
+  error: "Yes or No",
+});
+
+/**
  * Tree A: ProVolley and Inner West club jerseys. Identical on the old site
  * apart from the club named in the first question.
  */
@@ -80,15 +124,7 @@ function clubTree(club: string): PersonalisationTree {
     id: "club",
     club,
     fields: [
-      {
-        key: "player",
-        label: `Are you ${/^[aeiou]/i.test(club) ? "an" : "a"} ${club} player?`,
-        attribute: "Club player",
-        type: "select",
-        options: [YES, NO],
-        required: true,
-        error: "Yes or No",
-      },
+      playerField(club),
       {
         key: "junior",
         label: "Junior team?",
@@ -132,38 +168,28 @@ function clubTree(club: string): PersonalisationTree {
       numberField("preferredNumber", "Enter your preferred jersey number", "Preferred number", ANY_NUMBER, {
         all: [{ field: "player", equals: NO }],
       }),
-      {
-        key: "numberConfirmed",
-        label: "Has your jersey number been confirmed by the Club?",
-        attribute: "Number confirmed by club",
-        type: "select",
-        options: [NO, YES],
-        required: true,
-        showWhen: {
-          any: [
-            { field: "junior", equals: YES },
-            { field: "senior", equals: YES },
-          ],
-        },
-        error: "Yes or No",
-      },
-      numberField("confirmedNumber", "Enter your confirmed jersey number", "Confirmed number", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: YES }],
+      // A member in neither team has no club number either, so they pick one
+      // like a non-member. Same attribute: the two never show together.
+      numberField("noTeamNumber", "Enter your preferred jersey number", "Preferred number", ANY_NUMBER, {
+        all: [
+          { field: "junior", equals: NO },
+          { field: "senior", equals: NO },
+        ],
       }),
-      numberField("pref1", "Jersey number preference #1", "Number preference 1", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: NO }],
-      }),
-      numberField("pref2", "Jersey number preference #2", "Number preference 2", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: NO }],
-      }),
-      numberField("pref3", "Jersey number preference #3", "Number preference 3", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: NO }],
+      ...teamNumberFields({
+        any: [
+          { field: "junior", equals: YES },
+          { field: "senior", equals: YES },
+        ],
       }),
     ],
   };
 }
 
-/** Tree B: the Premier ProVolley Jersey, which also prints the player's name. */
+/**
+ * Tree B: the Premier ProVolley Jersey, which also prints the player's name.
+ * One team question (a player in two teams buys a jersey per team).
+ */
 function premierTree(): PersonalisationTree {
   return {
     id: "premier",
@@ -188,65 +214,47 @@ function premierTree(): PersonalisationTree {
         error: "Yes or No",
       },
       {
-        key: "u19",
-        label: "Do you play U19 Division?",
-        attribute: "U19 division",
+        key: "team",
+        label: "Select your team",
+        attribute: "Team",
         type: "select",
-        options: [NO, YES],
+        options: ["U19", "Reserves", "Premier"],
         required: true,
         showWhen: { all: [{ field: "player", equals: YES }] },
-        error: "Yes or No",
-      },
-      {
-        key: "senior",
-        label: "Do you play a Senior Division?",
-        attribute: "Senior division",
-        type: "select",
-        options: [NO, YES],
-        required: true,
-        showWhen: { all: [{ field: "player", equals: YES }] },
-        error: "Yes or No",
-      },
-      {
-        key: "seniorTeam",
-        label: "Select your Senior team",
-        attribute: "Senior team",
-        type: "select",
-        options: ["Reserves", "Premier"],
-        required: true,
-        showWhen: { all: [{ field: "senior", equals: YES }] },
-        error: "Select your Senior team",
+        error: "Select your team",
       },
       numberField("preferredNumber", "Enter your preferred jersey number", "Preferred number", ANY_NUMBER, {
         all: [{ field: "player", equals: NO }],
       }),
+      ...teamNumberFields({ all: [{ field: "player", equals: YES }] }),
+    ],
+  };
+}
+
+/**
+ * Tree C: ProVolley kids jerseys. The club flow with the kids' teams in place
+ * of junior and senior (not on the old site; agreed with Mladen 23 Oct 2026).
+ */
+function kidsTree(): PersonalisationTree {
+  return {
+    id: "kids",
+    club: "ProVolley",
+    fields: [
+      playerField("ProVolley"),
       {
-        key: "numberConfirmed",
-        label: "Has your jersey number been confirmed by the Club?",
-        attribute: "Number confirmed by club",
+        key: "team",
+        label: "Select your team",
+        attribute: "Team",
         type: "select",
-        options: [NO, YES],
+        options: ["Beginner", "Intermediate", "Advance"],
         required: true,
-        showWhen: {
-          any: [
-            { field: "u19", equals: YES },
-            { field: "senior", equals: YES },
-          ],
-        },
-        error: "Yes or No",
+        showWhen: { all: [{ field: "player", equals: YES }] },
+        error: "Select your team",
       },
-      numberField("confirmedNumber", "Enter your confirmed jersey number", "Confirmed number", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: YES }],
+      numberField("preferredNumber", "Enter your preferred jersey number", "Preferred number", ANY_NUMBER, {
+        all: [{ field: "player", equals: NO }],
       }),
-      numberField("pref1", "Jersey number preference #1", "Number preference 1", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: NO }],
-      }),
-      numberField("pref2", "Jersey number preference #2", "Number preference 2", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: NO }],
-      }),
-      numberField("pref3", "Jersey number preference #3", "Number preference 3", CLUB_NUMBER, {
-        all: [{ field: "numberConfirmed", equals: NO }],
-      }),
+      ...teamNumberFields({ all: [{ field: "player", equals: YES }] }),
     ],
   };
 }
@@ -261,7 +269,7 @@ const CLUB_IDS = {
  * Values of the optional `prosporter.personalisation` product metafield. Set it
  * in Shopify admin to force a tree on (or off) regardless of title and club.
  */
-export type PersonalisationOverride = "none" | "premier" | "provolley" | "inner-west";
+export type PersonalisationOverride = "none" | "premier" | "kids" | "provolley" | "inner-west";
 
 export type PersonalisationSubject = {
   title: string;
@@ -284,6 +292,8 @@ export function personalisationFor(product: PersonalisationSubject): Personalisa
       return null;
     case "premier":
       return premierTree();
+    case "kids":
+      return kidsTree();
     case "provolley":
       return clubTree("ProVolley");
     case "inner-west":
@@ -303,7 +313,7 @@ export function personalisationFor(product: PersonalisationSubject): Personalisa
     return clubTree("Inner West Volley");
   }
   if (product.clubs.includes(CLUB_IDS.provolley) || /pro\s*volley/.test(title)) {
-    return clubTree("ProVolley");
+    return /\bkids?\b/.test(title) ? kidsTree() : clubTree("ProVolley");
   }
   return null;
 }

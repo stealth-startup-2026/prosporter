@@ -12,14 +12,16 @@ with who it is for, instead of staff chasing buyers and typing it in by hand.
 
 ## What's built (this branch)
 
-- **The questions**, copied exactly from the old site (recovered from Wayback snapshots,
-  see [`README.md`](./README.md)). Two trees:
+- **The questions**, from the old site (recovered from Wayback snapshots) with the
+  changes Mladen confirmed on 23 Oct, see [`README.md`](./README.md). Three trees:
   - **Club jerseys** (ProVolley men's and women's, Inner West men's and women's):
     club player? → junior team? → U15/U17/U19 → senior team? → Division 1/2/3 →
     number confirmed by the club? → confirmed number, or three preferences.
-    Non-members just give a preferred number.
+    Non-members, and members in neither team, give a preferred number.
   - **Premier ProVolley Jersey**: last name for the back, Premier League player?,
-    U19?, senior division (Reserves / Premier), then the same number questions.
+    team (U19 / Reserves / Premier), then the same number questions.
+  - **ProVolley kids jerseys**: club player? → team (Beginner / Intermediate /
+    Advance), then the same number questions.
 - **Where answers go:** Shopify **line-item properties** (`attributes` on the cart line).
   They show on the order in Shopify admin under the line, on the customer's order
   confirmation, and in the bag drawer. A jersey with a different number is its own line.
@@ -27,11 +29,12 @@ with who it is for, instead of staff chasing buyers and typing it in by hand.
   in the title) that belongs to ProVolley or Inner West (club tag, `prosporter.club`
   metafield, or club named in the title). Teamwear jerseys (Modena, Italian) get nothing.
   To force it either way, set the product metafield **`prosporter.personalisation`**
-  (single line text) to `none`, `premier`, `provolley` or `inner-west`.
+  (single line text) to `none`, `premier`, `kids`, `provolley` or `inner-west`.
+  A ProVolley jersey with "kids" in the title gets the kids tree.
 - **Validation:** the first "Add to bag" click with a missing answer shows the message
   under that field and focuses it; nothing is added until every visible question is
-  answered. Numbers are whole, 1-99 for non-members and 1-60 for club numbers (the
-  old site's limit).
+  answered. Numbers are whole: 1-60 for team numbers (confirmed number, preferences),
+  1-99 for anyone not in a team.
 - **Server side:** the add-to-cart action only accepts bounded string pairs (max 24,
   key ≤ 100, value ≤ 255 chars), so nothing odd can reach the order.
 - **Checks:** typecheck, lint, 169 unit tests (23 new) and `SHOPIFY_OPTIONAL=1` build
@@ -51,14 +54,14 @@ Files: `src/lib/personalisation.ts` (rules), `src/components/product/Personalisa
 3. **Check out with a test order** (Shopify test gateway or a 100% discount code), then
    open the order in Shopify admin: the properties sit under the jersey line. That is the
    whole point, so do not skip it.
-4. **Confirm the product set.** The jerseys the migration left unlisted (ProVolley Jersey,
-   ProVolley Womens Jersey, Inner West Jersey, see your 6 Oct message to Mladen about the
-   "Number/Condition" option) should come back as plain products: the number is now asked
-   by this form, so they need no "Number" option at all.
+4. **Leave the unlisted clearance jerseys alone.** ProVolley Jersey, ProVolley Womens
+   Jersey, Inner West Jersey and the Modena ones carry a pre-printed Number and a Condition
+   (Used / Defect) on physical stock. That is not a buyer's choice, so this form does not
+   replace it; whether they go on Shopify is still an open question for Mladen.
 5. **Merge, then check prosporter.com.au** on a phone and a laptop.
 6. **Tell Mladen** it's live and that every jersey order now carries the answers on the
-   order page. Ask whether the divisions (U15/U17/U19, Division 1-3, Reserves/Premier)
-   are still right for 2026/27; they are one list each in `src/lib/personalisation.ts`.
+   order page. Teams and number ranges were confirmed with him on 23 Oct (see
+   "Changes agreed with Mladen" in [`README.md`](./README.md)).
 
 ## Optional, after launch
 
@@ -72,11 +75,9 @@ Files: `src/lib/personalisation.ts` (rules), `src/components/product/Personalisa
 
 ## Decisions for you
 
-- A club player who answers No to both junior and senior is asked nothing more (same as
-  the old site). If Mladen wants a number from them too, say so and it is a one-line rule.
-- The old site also asked two questions at checkout ("Athletes SVL team in 2025",
-  "Enter the name of your ProVolley team you play for"). Not rebuilt: the product form
-  already captures team and division. Shout if Mladen wants a free-text team name back.
+- Settled with Mladen on 23 Oct: a club player in no team now picks a number (1-99);
+  the old checkout questions ("Athletes SVL team in 2025", "Enter the name of your
+  ProVolley team") are not needed.
 
 ## Rules
 

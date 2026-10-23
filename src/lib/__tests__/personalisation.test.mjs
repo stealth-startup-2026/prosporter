@@ -2,7 +2,7 @@
  * Jersey personalisation rules: which tree a product gets, which questions are
  * visible for a set of answers, validation, and the attributes sent to Shopify.
  * The expected trees are the old WooCommerce site's PPOM forms
- * (docs/personalisation/README.md).
+ * (docs/personalisation/README.md) with the 23 Oct 2026 changes from Mladen.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -52,13 +52,21 @@ test("Inner West beats ProVolley when a title names both (an IWV jersey sold und
 });
 
 test("Premier ProVolley Jersey gets the premier tree with the name field first", () => {
-  const tree = personalisationFor(jersey("Premier ProVolley Jersey 2026/27"));
+  const tree = personalisationFor(jersey("ProVolley - Jersey  Premier Team 2026 Edition"));
   assert.equal(tree?.id, "premier");
   assert.equal(tree?.fields[0].key, "lastName");
-  assert.deepEqual(
-    tree?.fields.find((f) => f.key === "seniorTeam")?.options,
-    ["Reserves", "Premier"],
+  assert.deepEqual(tree?.fields.find((f) => f.key === "team")?.options, ["U19", "Reserves", "Premier"]);
+});
+
+test("ProVolley kids jersey gets the kids tree with the kids' teams", () => {
+  const tree = personalisationFor(
+    jersey("ProVolley - Kids Original Jersey 2022 Edition", { clubs: ["provolley-academy"] }),
   );
+  assert.equal(tree?.id, "kids");
+  assert.equal(tree?.fields[0].label, "Are you a ProVolley player?");
+  assert.deepEqual(tree?.fields.find((f) => f.key === "team")?.options, ["Beginner", "Intermediate", "Advance"]);
+  const forced = personalisationFor(jersey("Some Jersey", { details: { personalisation: ["kids"] } }));
+  assert.equal(forced?.id, "kids");
 });
 
 test("teamwear and non-club jerseys get no questions", () => {
@@ -138,12 +146,41 @@ test("a confirmed number asks for the number; an unconfirmed one asks for three 
   ]);
 });
 
-test("a member in neither team is asked nothing more (as on the old site)", () => {
+test("a member in neither team picks a preferred number like a non-member", () => {
   assert.deepEqual(keys(visibleFields(club, { player: YES, junior: NO, senior: NO })), [
     "player",
     "junior",
     "senior",
+    "noTeamNumber",
   ]);
+  // Not until both are answered No.
+  assert.deepEqual(keys(visibleFields(club, { player: YES, junior: NO })), ["player", "junior", "senior"]);
+  // Switching to non-member drops it for the non-member's own question.
+  assert.deepEqual(keys(visibleFields(club, { player: NO, junior: NO, senior: NO })), ["player", "preferredNumber"]);
+});
+
+test("premier: a player picks one team, then the number questions", () => {
+  const premier = personalisationFor(jersey("Premier ProVolley Jersey 2026/27"));
+  assert.deepEqual(keys(visibleFields(premier, { player: YES })), [
+    "lastName",
+    "player",
+    "team",
+    "numberConfirmed",
+  ]);
+  assert.deepEqual(keys(visibleFields(premier, { player: NO })), ["lastName", "player", "preferredNumber"]);
+});
+
+test("kids: a player picks a team and the number questions; a non-member a preferred number", () => {
+  const kids = personalisationFor(jersey("ProVolley Kids Jersey"));
+  assert.deepEqual(keys(visibleFields(kids, { player: YES, numberConfirmed: NO })), [
+    "player",
+    "team",
+    "numberConfirmed",
+    "pref1",
+    "pref2",
+    "pref3",
+  ]);
+  assert.deepEqual(keys(visibleFields(kids, { player: NO })), ["player", "preferredNumber"]);
 });
 
 test("switching back to non-member hides the whole team branch even with stale answers", () => {
@@ -159,10 +196,11 @@ test("required questions are flagged only while visible", () => {
   assert.deepEqual(validatePersonalisation(club, {}), { player: "Yes or No" });
   const errors = validatePersonalisation(club, { player: YES });
   assert.deepEqual(Object.keys(errors), ["junior", "senior"]);
-  assert.deepEqual(validatePersonalisation(club, { player: YES, junior: NO, senior: NO }), {});
+  assert.deepEqual(Object.keys(validatePersonalisation(club, { player: YES, junior: NO, senior: NO })), ["noTeamNumber"]);
+  assert.deepEqual(validatePersonalisation(club, { player: YES, junior: NO, senior: NO, noTeamNumber: "88" }), {});
 });
 
-test("numbers must be whole and within range: 1-99 for non-members, 1-60 for club numbers", () => {
+test("numbers must be whole and within range: 1-99 for anyone not in a team, 1-60 for team numbers", () => {
   assert.deepEqual(Object.keys(validatePersonalisation(club, { player: NO, preferredNumber: "12" })), []);
   assert.deepEqual(Object.keys(validatePersonalisation(club, { player: NO, preferredNumber: "100" })), ["preferredNumber"]);
   assert.deepEqual(Object.keys(validatePersonalisation(club, { player: NO, preferredNumber: "0" })), ["preferredNumber"]);
@@ -171,6 +209,14 @@ test("numbers must be whole and within range: 1-99 for non-members, 1-60 for clu
   const senior = { player: YES, junior: NO, senior: YES, seniorDivision: "Division 1", numberConfirmed: YES };
   assert.deepEqual(Object.keys(validatePersonalisation(club, { ...senior, confirmedNumber: "60" })), []);
   assert.deepEqual(Object.keys(validatePersonalisation(club, { ...senior, confirmedNumber: "61" })), ["confirmedNumber"]);
+  const noTeam = { player: YES, junior: NO, senior: NO };
+  assert.deepEqual(validatePersonalisation(club, { ...noTeam, noTeamNumber: "99" }), {});
+  assert.deepEqual(Object.keys(validatePersonalisation(club, { ...noTeam, noTeamNumber: "100" })), ["noTeamNumber"]);
+  const premier = personalisationFor(jersey("Premier ProVolley Jersey 2026/27"));
+  const premierPlayer = { lastName: "Smith", player: YES, team: "Reserves", numberConfirmed: YES };
+  assert.deepEqual(validatePersonalisation(premier, { ...premierPlayer, confirmedNumber: "60" }), {});
+  assert.deepEqual(Object.keys(validatePersonalisation(premier, { ...premierPlayer, confirmedNumber: "98" })), ["confirmedNumber"]);
+  assert.deepEqual(validatePersonalisation(premier, { lastName: "Smith", player: NO, preferredNumber: "98" }), {});
 });
 
 test("a select answer outside its options is rejected", () => {
@@ -224,6 +270,45 @@ test("premier attributes include the name on the back, trimmed", () => {
       { key: "Name on back", value: "Stankovic" },
       { key: "Premier League player", value: "No" },
       { key: "Preferred number", value: "9" },
+    ],
+  );
+});
+
+test("a member in no team sends their pick as Preferred number", () => {
+  assert.deepEqual(personalisationAttributes(club, { player: YES, junior: NO, senior: NO, noTeamNumber: "88" }), [
+    { key: "Club player", value: "Yes" },
+    { key: "Junior team", value: "No" },
+    { key: "Senior team", value: "No" },
+    { key: "Preferred number", value: "88" },
+  ]);
+});
+
+test("premier and kids players send their team as Team", () => {
+  const premier = personalisationFor(jersey("Premier ProVolley Jersey 2026/27"));
+  assert.deepEqual(
+    personalisationAttributes(premier, {
+      lastName: "Smith",
+      player: YES,
+      team: "U19",
+      numberConfirmed: YES,
+      confirmedNumber: "12",
+    }),
+    [
+      { key: "Name on back", value: "Smith" },
+      { key: "Premier League player", value: "Yes" },
+      { key: "Team", value: "U19" },
+      { key: "Number confirmed by club", value: "Yes" },
+      { key: "Confirmed number", value: "12" },
+    ],
+  );
+  const kids = personalisationFor(jersey("ProVolley Kids Jersey"));
+  assert.deepEqual(
+    personalisationAttributes(kids, { player: YES, team: "Beginner", numberConfirmed: YES, confirmedNumber: "5" }),
+    [
+      { key: "Club player", value: "Yes" },
+      { key: "Team", value: "Beginner" },
+      { key: "Number confirmed by club", value: "Yes" },
+      { key: "Confirmed number", value: "5" },
     ],
   );
 });
