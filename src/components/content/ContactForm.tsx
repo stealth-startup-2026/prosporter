@@ -39,12 +39,21 @@ import {
   CONTACT_FIELDS,
   HONEYPOT_FIELD,
   LIMITS,
+  PLAYER_GENDERS,
+  PLAYING_LEVELS,
   type ContactField,
 } from "@/lib/contact/validate";
 
 const FIELD_CLASS =
   "w-full rounded-card border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-subtle hover:border-muted focus:border-ink";
 const INVALID_CLASS = "border-ink";
+
+/** Local `YYYY-MM-DD`, the latest date the date-of-birth picker offers. */
+function todayIso(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
 
 /** One labelled control plus its reserved message line. */
 function Field({
@@ -171,6 +180,38 @@ export function ContactForm({ formToken }: { formToken: string }) {
               {(props) => <input {...props} type="text" required />}
             </Field>
           </div>
+          <fieldset className="sm:col-span-2 mt-2 grid gap-x-4 gap-y-2 sm:grid-cols-3">
+            <legend className="eyebrow mb-3 text-ink">About the player</legend>
+            <Field field="dateOfBirth" label="Date of birth" state={state}>
+              {(props) => (
+                <input {...props} type="date" autoComplete="bday" max={todayIso()} required />
+              )}
+            </Field>
+            <Field field="gender" label="Gender" state={state}>
+              {({ maxLength: _maxLength, ...props }) => (
+                <select {...props} required>
+                  <option value="">Select</option>
+                  {PLAYER_GENDERS.map((gender) => (
+                    <option key={gender} value={gender}>
+                      {gender}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            <Field field="playingLevel" label="Playing level" state={state}>
+              {({ maxLength: _maxLength, ...props }) => (
+                <select {...props} required>
+                  <option value="">Select a level</option>
+                  {PLAYING_LEVELS.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          </fieldset>
           <div className="sm:col-span-2">
             <Field
               field="message"

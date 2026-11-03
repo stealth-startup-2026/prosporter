@@ -43,11 +43,19 @@ criterion 2. The rebuild keeps the visible field set and fixes both faults.
 | `your-name` (placeholder "E-mail address") | `email` | yes | 160, format-checked |
 | — (added) | `phone` | no | 32, digits and separators |
 | `your-name` (placeholder "Subject") | `subject` | yes | 120 |
+| — (added, CLNT-555) | `dateOfBirth` | yes | real past date, at most 100 years back |
+| — (added, CLNT-555) | `gender` | yes | Female / Male / Other / Prefer not to say |
+| — (added, CLNT-555) | `playingLevel` | yes | Beginner / Intermediate / Advanced / Professional |
 | `textarea-935` (maxlength 2000) | `message` | yes | 10–2000 |
 
 `phone` is the one addition. The same Contact page advertises a phone line, and
 a number supplied up front saves a round trip on order questions. It is
 optional, so it cannot block a submission.
+
+The "About the player" block (`dateOfBirth`, `gender`, `playingLevel`) was asked
+for by Mladen on 3 Nov 2026 (CLNT-555), the same questions as the Inner West
+club form (CLNT-554) minus the training locations, which a store does not have.
+All three are required and appear under "Player:" in the enquiry email.
 
 ### Newsletter (form 97)
 

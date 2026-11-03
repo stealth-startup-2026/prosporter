@@ -28,6 +28,10 @@ import {
 import {
   HONEYPOT_FIELD,
   LIMITS,
+  PLAYER_GENDERS,
+  PLAYING_LEVELS,
+  checkDateOfBirth,
+  formatDateOfBirth,
   MESSAGE_MIN_LENGTH,
   isHoneypotFilled,
   normalizeField,
@@ -40,6 +44,9 @@ const valid = () => ({
   email: "alex@example.com",
   phone: "+61 2 8313 3805",
   subject: "Order 1234 sizing",
+  dateOfBirth: "2012-05-14",
+  gender: "Female",
+  playingLevel: "Beginner",
   message: "Could you confirm the sizing on the club jersey before I reorder?",
 });
 
@@ -63,13 +70,41 @@ test("every required field reports its own error", () => {
   const result = validateContactSubmission({});
   assert.equal(result.ok, false);
   assert.deepEqual(Object.keys(result.errors).sort(), [
+    "dateOfBirth",
     "email",
     "firstName",
+    "gender",
     "lastName",
     "message",
+    "playingLevel",
     "subject",
   ]);
   assert.equal(result.errors.phone, undefined);
+});
+
+test("player questions accept only the listed options", () => {
+  for (const gender of PLAYER_GENDERS) {
+    assert.equal(validateContactSubmission({ ...valid(), gender }).ok, true, gender);
+  }
+  for (const playingLevel of PLAYING_LEVELS) {
+    assert.equal(validateContactSubmission({ ...valid(), playingLevel }).ok, true, playingLevel);
+  }
+  const bad = validateContactSubmission({ ...valid(), gender: "Robot", playingLevel: "Expert" });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.errors.gender, "Select a gender.");
+  assert.equal(bad.errors.playingLevel, "Select a playing level.");
+});
+
+test("date of birth must be a real past date", () => {
+  const today = new Date(2026, 10, 3);
+  assert.equal(checkDateOfBirth("2012-05-14", today), null);
+  assert.equal(checkDateOfBirth("2026-11-03", today), null);
+  assert.equal(checkDateOfBirth("", today), "Date of birth is required.");
+  assert.equal(checkDateOfBirth("14/05/2012", today), "Enter a valid date of birth.");
+  assert.equal(checkDateOfBirth("2013-02-29", today), "Enter a valid date of birth.");
+  assert.equal(checkDateOfBirth("2026-11-04", today), "Date of birth cannot be in the future.");
+  assert.equal(checkDateOfBirth("1900-01-01", today), "Enter a valid date of birth.");
+  assert.equal(formatDateOfBirth("2012-05-14"), "14/05/2012");
 });
 
 test("malformed email addresses are rejected", () => {
