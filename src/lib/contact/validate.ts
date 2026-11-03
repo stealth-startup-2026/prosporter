@@ -12,6 +12,10 @@
  * one addition — the same page advertises a phone line, and a caller-supplied
  * number saves a round trip on order questions. It is optional.
  *
+ * The "About the player" block (date of birth, gender, playing level) was asked
+ * for by Mladen on 3 Nov 2026 (CLNT-555), matching the Inner West club form
+ * (CLNT-554). All three are required.
+ *
  * See `docs/forms.md` for the disposition of all three legacy forms.
  */
 
@@ -22,8 +26,20 @@ export const CONTACT_FIELDS = [
   "email",
   "phone",
   "subject",
+  "dateOfBirth",
+  "gender",
+  "playingLevel",
   "message",
 ] as const;
+
+/** Gender options, the same list as the Inner West form. */
+export const PLAYER_GENDERS = ["Female", "Male", "Other", "Prefer not to say"] as const;
+
+/** Playing level options, as Mladen listed them. */
+export const PLAYING_LEVELS = ["Beginner", "Intermediate", "Advanced", "Professional"] as const;
+
+/** Oldest date of birth accepted, in years before today. */
+export const MAX_PLAYER_AGE_YEARS = 100;
 
 export type ContactField = (typeof CONTACT_FIELDS)[number];
 
@@ -38,6 +54,10 @@ export type ContactValues = {
   /** Empty string when not supplied. */
   phone: string;
   subject: string;
+  /** ISO `YYYY-MM-DD`, as the date input posts it. */
+  dateOfBirth: string;
+  gender: string;
+  playingLevel: string;
   message: string;
 };
 
@@ -52,6 +72,9 @@ export const LIMITS = {
   email: 160,
   phone: 32,
   subject: 120,
+  dateOfBirth: 10,
+  gender: 32,
+  playingLevel: 32,
   message: 2000,
 } as const;
 
@@ -83,6 +106,48 @@ const CONTROL_RE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
 export function normalizeField(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.replace(/\r\n?/g, "\n").replace(CONTROL_RE, "").trim();
+}
+
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Check a `YYYY-MM-DD` date of birth: a real calendar date, not in the future,
+ * and no more than `MAX_PLAYER_AGE_YEARS` back. Returns an error message, or
+ * null when the date is fine. `today` is injectable for tests.
+ */
+export function checkDateOfBirth(value: string, today: Date = new Date()): string | null {
+  if (!value) return "Date of birth is required.";
+  const match = ISO_DATE_RE.exec(value);
+  if (!match) return "Enter a valid date of birth.";
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return "Enter a valid date of birth.";
+  }
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  if (date.getTime() > todayUtc) return "Date of birth cannot be in the future.";
+  if (year < today.getFullYear() - MAX_PLAYER_AGE_YEARS) return "Enter a valid date of birth.";
+  return null;
+}
+
+/** `2012-05-14` -> `14/05/2012`, the Australian order, for the mail body. */
+export function formatDateOfBirth(value: string): string {
+  const match = ISO_DATE_RE.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
+
+function requireOption(
+  errors: ContactFieldErrors,
+  field: ContactField,
+  value: string,
+  options: readonly string[],
+  message: string,
+): void {
+  if (!options.includes(value)) errors[field] = message;
 }
 
 /** Collapse a single-line field so a pasted newline cannot forge a mail header. */
@@ -124,6 +189,9 @@ export function validateContactSubmission(raw: Record<string, unknown>): Contact
     email: singleLine(normalizeField(raw.email)),
     phone: singleLine(normalizeField(raw.phone)),
     subject: singleLine(normalizeField(raw.subject)),
+    dateOfBirth: singleLine(normalizeField(raw.dateOfBirth)),
+    gender: singleLine(normalizeField(raw.gender)),
+    playingLevel: singleLine(normalizeField(raw.playingLevel)),
     message: normalizeField(raw.message),
   };
 
@@ -150,6 +218,11 @@ export function validateContactSubmission(raw: Record<string, unknown>): Contact
   }
 
   requireText(errors, "subject", values.subject, "Subject", LIMITS.subject);
+
+  const dateOfBirthError = checkDateOfBirth(values.dateOfBirth);
+  if (dateOfBirthError) errors.dateOfBirth = dateOfBirthError;
+  requireOption(errors, "gender", values.gender, PLAYER_GENDERS, "Select a gender.");
+  requireOption(errors, "playingLevel", values.playingLevel, PLAYING_LEVELS, "Select a playing level.");
 
   if (!values.message) {
     errors.message = "Message is required.";

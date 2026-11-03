@@ -18,7 +18,7 @@ import "server-only";
  * counts, per the rule in `src/lib/log.ts`.
  */
 import { DELIVERY_TIMEOUT_MS, contactConfig } from "./config";
-import type { ContactValues } from "./validate";
+import { formatDateOfBirth, type ContactValues } from "./validate";
 import { errorFields, log } from "../log";
 import { deploymentEnvironment } from "../site";
 
@@ -73,6 +73,11 @@ function renderBody(values: ContactValues, requestId: string): string {
     `Email:   ${values.email}`,
     `Phone:   ${values.phone || "(not supplied)"}`,
     `Subject: ${values.subject}`,
+    "",
+    "Player:",
+    `  Date of birth: ${formatDateOfBirth(values.dateOfBirth)}`,
+    `  Gender:        ${values.gender}`,
+    `  Playing level: ${values.playingLevel}`,
     "",
     values.message,
     "",
