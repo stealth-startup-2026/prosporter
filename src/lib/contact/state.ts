@@ -40,9 +40,6 @@ export const EMPTY_CONTACT_VALUES: ContactValues = {
   email: "",
   phone: "",
   subject: "",
-  dateOfBirth: "",
-  gender: "",
-  playingLevel: "",
   message: "",
 };
 
