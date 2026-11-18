@@ -5,6 +5,7 @@ import { getHomeCatalog } from "@/lib/catalog-source";
 import { ProductCard } from "@/components/product/ProductCard";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { HeroBackground } from "@/components/home/HeroBackground";
+import { PromoBanner } from "@/components/promo/PromoBanner";
 import { ArrowRight } from "@/components/icons";
 
 /**
@@ -68,6 +69,10 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {/* ──────────────────── Sale banner ────────────────────
+          Only inside a sale's window (src/lib/promo.ts); nothing otherwise. */}
+      <PromoBanner />
 
       {/* ──────────────────── Shop by type ──────────────────── */}
       <section className="mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:px-8">

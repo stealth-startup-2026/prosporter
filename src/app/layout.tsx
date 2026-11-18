@@ -7,6 +7,7 @@ import { CartDrawerMount } from "@/components/cart/CartDrawerMount";
 import { isShopifyConfigured } from "@/lib/shopify";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { PromoBar } from "@/components/promo/PromoBar";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildOrganizationJsonLd, buildWebSiteJsonLd } from "@/lib/seo/json-ld";
 import { OG_DEFAULTS } from "@/lib/seo/metadata";
@@ -85,6 +86,10 @@ export default function RootLayout({
             cutover. See docs/deployment.md § Analytics. */}
         <Analytics />
         <CartProvider enabled={cartEnabled}>
+          {/* Time-limited sale bar (src/lib/promo.ts). Above the sticky header
+              on purpose: it leads the page, then scrolls away. Renders nothing
+              outside the sale's window. */}
+          <PromoBar />
           <Header />
           {/* tabIndex={-1} so the skip link can move real focus here, not just
               the scroll position; scroll-margin keeps it clear of the sticky
