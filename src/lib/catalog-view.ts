@@ -124,6 +124,69 @@ export function findVariant(
   );
 }
 
+/**
+ * How an option value stands, given the options chosen *before* it.
+ *
+ * Options are ordered (Size, then Custom, …), as Shopify orders them. The first
+ * option always lists every value; each later one only offers the values that
+ * exist alongside the earlier choices. So with Size S chosen on a jersey whose S
+ * variants are only "#8 - De Cecco" and "#15 - De Cecco", every other player
+ * name is "missing" and the picker hides it, while a name whose S variants are
+ * all out of stock is "soldOut" and stays visible, crossed out.
+ *
+ * Later choices are ignored on purpose: switching Size must never hide a size.
+ * With no variants (the mock catalog) every value is "available".
+ */
+export type OptionValueState = "available" | "soldOut" | "missing";
+
+export function optionValueState(
+  product: Pick<CatalogProductDetail, "options" | "variants">,
+  selection: Record<string, string>,
+  optionName: string,
+  value: string,
+): OptionValueState {
+  if (product.variants.length === 0) return "available";
+  const index = product.options.findIndex((o) => o.name === optionName);
+  const earlier = product.options
+    .slice(0, Math.max(index, 0))
+    .filter((o) => selection[o.name] !== undefined);
+  const has = (v: CatalogVariant, name: string, val: string) =>
+    v.selectedOptions.some((o) => o.name === name && o.value === val);
+  const matches = product.variants.filter(
+    (v) => has(v, optionName, value) && earlier.every((o) => has(v, o.name, selection[o.name])),
+  );
+  if (matches.length === 0) return "missing";
+  return matches.some((v) => v.available) ? "available" : "soldOut";
+}
+
+/**
+ * Applies a shopper's pick and tidies the options after it.
+ *
+ * Any later choice that no longer exists with the new earlier choices is
+ * dropped (S + "#7 - Stankovic" becomes just S), so the page never sits on a
+ * combination Shopify has no variant for. When a later option is left with
+ * exactly one existing value, that value is chosen for the shopper.
+ */
+export function chooseOption(
+  product: Pick<CatalogProductDetail, "options" | "variants">,
+  selection: Record<string, string>,
+  optionName: string,
+  value: string,
+): Record<string, string> {
+  const next: Record<string, string> = { ...selection, [optionName]: value };
+  if (product.variants.length === 0) return next;
+  const index = product.options.findIndex((o) => o.name === optionName);
+  for (const option of product.options.slice(index + 1)) {
+    const existing = option.values.filter(
+      (v) => optionValueState(product, next, option.name, v) !== "missing",
+    );
+    const current = next[option.name];
+    if (current !== undefined && !existing.includes(current)) delete next[option.name];
+    if (next[option.name] === undefined && existing.length === 1) next[option.name] = existing[0];
+  }
+  return next;
+}
+
 const SIZE_ORDER = ["4XS", "3XS", "2XS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "S/M", "M/L"];
 
 /**

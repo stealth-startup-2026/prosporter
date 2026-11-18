@@ -4,8 +4,10 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  chooseOption,
   findVariant,
   isSizeOption,
+  optionValueState,
   type CatalogProductDetail,
 } from "@/lib/catalog-view";
 import { formatPrice, formatPriceRange, swatchFor } from "@/lib/format";
@@ -144,7 +146,14 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
 
   const price = variant?.price ?? product.price;
   const compareAt = variant?.compareAtPrice ?? product.compareAtPrice;
-  const inStock = variant ? variant.available : product.inStock;
+  // A full selection with no matching variant is not buyable. Falling back to
+  // the product's own stock here once left "Add to bag" live on S + a player
+  // name that only exists in L.
+  const inStock = variant
+    ? variant.available
+    : complete && product.variants.length > 0
+      ? false
+      : product.inStock;
   const sizeOption = product.options.find((o) => isSizeOption(o.name));
 
   /**
@@ -186,18 +195,8 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
   const lowStockHint =
     addable && lowStock && totalStock > 0 ? `Only ${totalStock} left` : null;
 
-  /** Does any purchasable variant carry this option value? */
-  const valueAvailable = (optionName: string, value: string) => {
-    if (product.variants.length === 0) return true;
-    return product.variants.some(
-      (v) =>
-        v.available &&
-        v.selectedOptions.some((o) => o.name === optionName && o.value === value),
-    );
-  };
-
   const choose = (option: string, value: string) => {
-    setSelection((s) => ({ ...s, [option]: value }));
+    setSelection((s) => chooseOption(product, s, option, value));
     setPickedImage(null);
     // A new variant has its own stock; start the stepper back at one.
     setQuantity(1);
@@ -400,7 +399,11 @@ export function ProductDetail({ product }: { product: CatalogProductDetail }) {
               <div className="flex flex-wrap gap-2">
                 {option.values.map((value) => {
                   const active = selection[option.name] === value;
-                  const soldOut = !valueAvailable(option.name, value);
+                  // Values that do not exist with the earlier choices (a player
+                  // name not made in the chosen size) are not offered at all.
+                  const state = optionValueState(product, selection, option.name, value);
+                  if (state === "missing" && !active) return null;
+                  const soldOut = state === "soldOut";
                   const input = (
                     <input
                       type="radio"
